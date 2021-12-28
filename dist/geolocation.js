@@ -86,7 +86,7 @@ Define global events to handle device orientation and calibration
         else
             if (event.absolute && event.alpha)
                 // Android
-                event.XXorientation = 360 - event.alpha;
+                event.XXorientation = 360 - parseInt(event.alpha);
 
 //HER        if (event.XXorientation !== null)
 //HER            event.XXorientation = Math.round(event.XXorientation);
