@@ -30,7 +30,7 @@
         var count = 0;
         ns.onDeviceorientation( function( event ){
             var $div = $('.info'), 
-                html = 'VERSION 0.0.15 (' + (count++ % 5) + ')';
+                html = 'VERSION 0.0.16 (' + (count++ % 5) + ')';
 
             $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
                 html = html + '<br>' + id + ': ' + event[id];

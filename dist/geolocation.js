@@ -89,7 +89,7 @@ Define global events to handle device orientation and calibration
                 event.deviceorientation = 360 - parseInt(event.alpha);
 
         $.each(['deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
-            if (event[id] !== null)
+            if (typeof event[id] == 'number')
                 event[id] = Math.round(event[id]);
         });
 
