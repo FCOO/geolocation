@@ -17,7 +17,7 @@
             text-align: center;
         }
     </style>
-</head> 
+</head>
 
 <body>
     <script src="bower_components.js"></script>
@@ -30,10 +30,10 @@
         var count = 0;
         ns.onDeviceorientation( function( event ){
             var $div = $('.info'), 
-                html = 'VERSION 0.0.16 (' + (count++ % 5) + ')';
+                html = 'VERSION 0.0.15 (' + (count++ % 5) + ')';
 
             $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
-                html = html + '<br>' + id + ': ' + event[id];
+                html = html + '<br>' + id + ': ' + (typeof event[id] == 'number' ? Math.round(event[id]) : event[id]);
             });
 
             $div.html(html);

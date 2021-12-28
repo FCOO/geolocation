@@ -88,10 +88,8 @@ Define global events to handle device orientation and calibration
                 // Android
                 event.deviceorientation = 360 - parseInt(event.alpha);
 
-        $.each(['deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
-            if (typeof event[id] == 'number')
-                event[id] = Math.round(event[id]);
-        });
+        if (event.deviceorientation !== null)
+            event.deviceorientation = Math.round(event.deviceorientation);
 
         triggerList(onDeviceorientationList, event);
     }
