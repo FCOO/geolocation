@@ -30,7 +30,7 @@
 
         ns.onDeviceorientation( function( event ){
             var $div = $('.info'), 
-                html = 'VERSION 0.0.4';
+                html = 'VERSION 0.0.5 (' + Math.round(10000*Math.random()) + ')';
 
             $.each(['alpha', 'beta', 'gamma'], function(index, id){
                 html = html + '<br>' + id + ': ' + Math.round(event[id]) + '  (' + event[id] + ')';
