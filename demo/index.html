@@ -30,10 +30,10 @@
 
         ns.onDeviceorientation( function( event ){
             var $div = $('.info'), 
-                html = 'VERSION 0.0.3';
+                html = 'VERSION 0.0.4';
 
             $.each(['alpha', 'beta', 'gamma'], function(index, id){
-                html = (html ? '<br>' : '') + id + ': ' + Math.round(event[id]) + '  (' + event[id] + ')';
+                html = html + '<br>' + id + ': ' + Math.round(event[id]) + '  (' + event[id] + ')';
             });
 
             $div.html(html);
