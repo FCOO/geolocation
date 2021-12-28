@@ -76,22 +76,25 @@ Define global events to handle device orientation and calibration
 
     ***********************************************************************/
     function onDeviceOrientation(jquery_event) {
-        var event = jquery_event.originalEvent;
+        var event    = jquery_event.originalEvent,
+            newEvent = {},
+            deviceorientation = null;
 
-        //Find device orientation
-        event.deviceorientation = null;
         if (event.webkitCompassHeading)
             // iOS
-            event.deviceorientation = event.webkitCompassHeading;
+            deviceorientation = event.webkitCompassHeading;
         else
             if (event.absolute && event.alpha)
                 // Android
-                event.deviceorientation = 360 - parseInt(event.alpha);
+                deviceorientation = 360 - parseInt(event.alpha);
 
-        if (event.deviceorientation !== null)
-            event.deviceorientation = Math.round(event.deviceorientation);
+        event.deviceorientation = deviceorientation;
 
-        triggerList(onDeviceorientationList, event);
+        $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
+            newEvent[id] = typeof event[id] == 'number' ? Math.round(event[id]) : event[id];
+        });
+
+        triggerList(onDeviceorientationList, newEvent);
     }
 
     //Set correct event
@@ -99,7 +102,6 @@ Define global events to handle device orientation and calibration
     if (oriAbs || ('ondeviceorientation' in window)) {
 
         var add_event_deviceorientation = function() {
-//HER            L.DomEvent.on(window, oriAbs ? 'deviceorientationabsolute' : 'deviceorientation', onDeviceOrientation);
             $(window).on(oriAbs ? 'deviceorientationabsolute' : 'deviceorientation', onDeviceOrientation);
         };
 
