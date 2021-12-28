@@ -30,10 +30,10 @@
         var count = 0;
         ns.onDeviceorientation( function( event ){
             var $div = $('.info'), 
-                html = 'VERSION 0.0.13 (' + (count++ % 5) + ')';
+                html = 'VERSION 0.0.14 (' + (count++ % 5) + ')';
 
             $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
-                html = html + '<br>' + id + ': ' + typeof event[id] +' '+(typeof event[id] == 'number' ? Math.round(event[id]) : event[id]);// + '  (' + event[id] + ')';
+                html = html + '<br>' + id + ': ' + event[id];
             });
 
             $div.html(html);
