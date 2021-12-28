@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="da" style="font-size: 100%">
+<head>
+    <title>fcoo.dk - geolocation - Demo</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv='x-dns-prefetch-control' content='on'>
+
+    <meta name='copyright' content='FCOO'>
+    <meta name='owner' content='FCOO'>
+    <style>
+        .info {
+            border: 1px solid black;
+            width: 360px;
+            min-height: 200px;
+            margin: auto;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="bower_components.js"></script>
+    <script src="../src/geolocation-device-orientation-events.js"></script>
+    <script src="../src/geolocation-provider-handler.js"></script>
+    <!-- <script src="../src/geolocation-standard.js"></script> -->
+
+    <script>
+        var ns = window.geolocation;
+
+        ns.onDeviceorientation( function( event ){
+            var $div = $('.info');
+
+            $div.text('Hej' + Math.random());
+
+
+        });
+    </script>
+
+    <div class="info"></div>
+</body>
+</html>

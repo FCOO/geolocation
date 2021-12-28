@@ -1,0 +1,26 @@
+{
+  "name": "geolocation",
+  "version": "0.0.1",
+  "homepage": "https://github.com/FCOO/geolocation",
+  "authors": "Niels Holt",
+  "description": "",
+  "main": "dist/geolocation.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/FCOO/geolocation.git"
+  },
+  "dependencies": {
+    "jquery": "latest"
+  },
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "moduleType": [
+    "es6"
+  ]
+}
