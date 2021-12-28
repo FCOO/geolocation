@@ -29,9 +29,10 @@
         var ns = window.geolocation;
 
         ns.onDeviceorientation( function( event ){
-            var $div = $('.info'), html = '', ids = ['alpha', 'beta', 'gamma'];
+            var $div = $('.info'), 
+                html = 'VERSION 0.0.3';
 
-            $.each(ids, function(index, id){
+            $.each(['alpha', 'beta', 'gamma'], function(index, id){
                 html = (html ? '<br>' : '') + id + ': ' + Math.round(event[id]) + '  (' + event[id] + ')';
             });
 
