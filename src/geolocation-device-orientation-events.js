@@ -46,7 +46,7 @@ Define global events to handle device orientation and calibration
     }
 
 
-    function triggerList(list, event){ console.log(event);
+    function triggerList(list, event){
         $.each(list, function(id, fn_context){
             if (fn_context)
                 fn_context.fn.call(fn_context.context, event);
@@ -79,17 +79,17 @@ Define global events to handle device orientation and calibration
         var event = jquery_event.originalEvent;
 
         //Find direction
-        var deviceOrientation = null;
+        event.orientation = null;
         if (event.webkitCompassHeading)
             // iOS
-            deviceOrientation = event.webkitCompassHeading;
+            event.orientation = event.webkitCompassHeading;
         else
             if (event.absolute && event.alpha)
                 // Android
-                deviceOrientation = 360 - event.alpha;
+                event.orientation = 360 - event.alpha;
 
-        if (deviceOrientation !== null)
-            deviceOrientation = Math.round(deviceOrientation);
+        if (event.orientation !== null)
+            event.orientation = Math.round(event.orientation);
 
 //MANGLER beta og gamma
 

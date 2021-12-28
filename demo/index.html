@@ -27,13 +27,13 @@
 
     <script>
         var ns = window.geolocation;
-
+        var count = 0;
         ns.onDeviceorientation( function( event ){
             var $div = $('.info'), 
-                html = 'VERSION 0.0.6 (' + Math.round(10000*Math.random()) + ')';
+                html = 'VERSION 0.0.7 (' + (count++ % 5) + ')';
 
-            $.each(['alpha', 'beta', 'gamma'], function(index, id){
-                html = html + '<br>' + id + ': ' + Math.round(event[id]);// + '  (' + event[id] + ')';
+            $.each(['absolute', 'orientation', 'alpha', 'beta', 'gamma'], function(index, id){
+                html = html + '<br>' + id + ': ' + (typeof event[id] == 'number' ? Math.round(event[id]) : event[id]);// + '  (' + event[id] + ')';
             });
 
             $div.html(html);
