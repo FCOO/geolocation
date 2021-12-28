@@ -79,17 +79,17 @@ Define global events to handle device orientation and calibration
         var event = jquery_event.originalEvent;
 
         //Find direction
-        event.orientation = null;
+        event.XXorientation = event.alpha;//null;
         if (event.webkitCompassHeading)
             // iOS
-            event.orientation = event.webkitCompassHeading;
+            event.XXorientation = event.webkitCompassHeading;
         else
             if (event.absolute && event.alpha)
                 // Android
-                event.orientation = 360 - event.alpha;
+                event.XXorientation = 360 - event.alpha;
 
-        if (event.orientation !== null)
-            event.orientation = Math.round(event.orientation);
+        if (event.XXorientation !== null)
+            event.XXorientation = Math.round(event.XXorientation);
 
 //MANGLER beta og gamma
 
