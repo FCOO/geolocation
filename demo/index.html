@@ -9,10 +9,10 @@
     <meta name='copyright' content='FCOO'>
     <meta name='owner' content='FCOO'>
     <style>
-        .info {
+        .device, .location, .calibration {
             border: 1px solid black;
             width: 360px;
-            min-height: 200px;
+            min-height: 100px;
             margin: auto;
             text-align: center;
         }
@@ -23,14 +23,14 @@
     <script src="bower_components.js"></script>
     <script src="../src/geolocation-device-orientation-events.js"></script>
     <script src="../src/geolocation-provider-handler.js"></script>
-    <!-- <script src="../src/geolocation-standard.js"></script> -->
+    <script src="../src/geolocation-standard.js"></script>
 
     <script>
         var ns = window.geolocation;
         var count = 0;
         ns.onDeviceorientation( function( event ){
-            var $div = $('.info'), 
-                html = 'VERSION 0.0.20 (' + (count++ % 5) + ')';
+            var $div = $('.device'), 
+                html = 'DEVICE ORIENTATION v. 0.0.21 (' + (count++ % 10) + ')';
 
             $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
                 //html = html + '<br>' + id + ': ' + (typeof event[id] == 'number' ? Math.round(event[id]) : event[id]);
@@ -38,11 +38,31 @@
             });
 
             $div.html(html);
-
-
         });
+
+        var locationCount = 0;
+        var testHandler = {
+                setCoords: function( coords ){
+console.log('>>>>>>>>>>>>>>>>>', coords );
+                    var $div = $('.location'), 
+                        html = 'LOCATION AND SPEED (' + (locationCount++ % 10) + ')';
+
+
+                    $.each(['latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
+                        html = html + '<br>' + id + ': ' + coords[id];
+                    });
+                    $div.html(html);
+                }
+            }
+
+        ns.provider.add( testHandler );    
+        ns.provider.add( testHandler );    
+        ns.provider.add( testHandler );    
+
+    
     </script>
 
-    <div class="info"></div>
+    <div class="device"></div>
+    <div class="location"></div>
 </body>
 </html>
