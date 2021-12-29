@@ -37,7 +37,7 @@ provides location from the browser geolocation API
             Note that this can result in slower response times or increased power consumption (with a GPS chip on a mobile device for example).
             On the other hand, if false, the device can take the liberty to save resources by responding more quickly and/or using less power. Default: false.
         */
-        enableHighAccuracy  : true
+        enableHighAccuracy  : false, //true
     };
 
     /*
