@@ -30,7 +30,7 @@
         var count = 0;
         ns.onDeviceorientation( function( event ){
             var $div = $('.device'), 
-                html = 'DEVICE ORIENTATION v. 0.0.25 (' + (count++ % 10) + ')';
+                html = 'DEVICE ORIENTATION v. 0.0.26 (' + (count++ % 10) + ')';
 
             $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
                 //html = html + '<br>' + id + ': ' + (typeof event[id] == 'number' ? Math.round(event[id]) : event[id]);
