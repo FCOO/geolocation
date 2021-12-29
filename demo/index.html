@@ -30,7 +30,7 @@
         var count = 0;
         ns.onDeviceorientation( function( event ){
             var $div = $('.device'), 
-                html = 'DEVICE ORIENTATION v. 0.0.21 (' + (count++ % 10) + ')';
+                html = 'DEVICE ORIENTATION v. 0.0.22 (' + (count++ % 10) + ')';
 
             $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
                 //html = html + '<br>' + id + ': ' + (typeof event[id] == 'number' ? Math.round(event[id]) : event[id]);
@@ -43,7 +43,7 @@
         var locationCount = 0;
         var testHandler = {
                 setCoords: function( coords ){
-console.log('>>>>>>>>>>>>>>>>>', coords );
+//console.log('>>>>>>>>>>>>>>>>>', coords );
                     var $div = $('.location'), 
                         html = 'LOCATION AND SPEED (' + (locationCount++ % 10) + ')';
 

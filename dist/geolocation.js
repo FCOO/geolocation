@@ -170,20 +170,22 @@ window.geolocation.GeolocationHandler:
         speed            : Velocity of the device in meters per second. This value can be null.
 
         If the GeolocationProvider also detects device orientation the following values are included.
-        See https://developers.google.com/web/fundamentals/native-hardware/device-orientation for details.
-        deviceOrientation_absolute: See https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent/absolute
-        deviceOrientation_alpha   : See https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent/alpha
-        deviceOrientation_beta    : See https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent/beta
-        deviceOrientation_gamma   : See https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent/gamma
-    }
-    All properties are double
+        See src/geolocation-device-orientation-events.js and https://developers.google.com/web/fundamentals/native-hardware/device-orientation for details.
+        deviceOrientation: {
+            absolute            : BOOLEAN,
+            deviceorientation   : NUMBER or null,
+            webkitCompassHeading: NUMBER or null,
+            alpha               : NUMBER or null,
+            beta                : NUMBER or null,
+            gamma               : NUMBER or null
+        }
 
-    error = Must contain the following properites taken from GeolocationPositionError (see https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPositionError)
+
+    error = Must contain the following properties taken from GeolocationPositionError (see https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPositionError)
         code: Returns an unsigned short representing the error code. The following values are possible:
-            1     PERMISSION_DENIED        The acquisition of the geolocation information failed because the page didn't have the permission to do it.
-            2    POSITION_UNAVAILABLE    The acquisition of the geolocation failed because at least one internal source of position returned an internal error.
-            3    TIMEOUT                    The time allowed to acquire the geolocation was reached before the information was obtained.
-
+            1   PERMISSION_DENIED       The acquisition of the geolocation information failed because the page didn't have the permission to do it.
+            2   POSITION_UNAVAILABLE    The acquisition of the geolocation failed because at least one internal source of position returned an internal error.
+            3   TIMEOUT                 The time allowed to acquire the geolocation was reached before the information was obtained.
             4   OLD                     The last coordinates are now to old acoording to options.maximumAge
 
         message: Returns a human-readable DOMString describing the details of the error
@@ -210,7 +212,7 @@ window.geolocation.GeolocationHandler:
         this.maximumAge = this.options.maximumAge === 0 ? 0 : this.options.maximumAge || 0;
 
         //this.active = false;
-
+        this.updateNo = 0;
         this.statusOk = true;
 
         this.coords = {
@@ -243,7 +245,7 @@ window.geolocation.GeolocationHandler:
         add: function( geolocationHandler ){
             geolocationHandler.glh_id = geolocationHandler.glh_id || 'geolocationHandler' + handlerId++;
 
-            if (!geolocationHandler.glh_id){
+            if (!this.geolocationHandlers[geolocationHandler.glh_id]){
                 this.geolocationHandlers[geolocationHandler.glh_id] = geolocationHandler;
                 this.nrOfGeolocationHandlers++;
                 if (this.nrOfGeolocationHandlers == 1){
@@ -284,9 +286,20 @@ window.geolocation.GeolocationHandler:
 
         timeout: function(){
             this.onError({
-                code: 4,
+                code   : 4,
                 message: 'The last coordinates are to old to be valid'
             });
+        },
+
+
+        roundToDecimals: {
+            latitude        : 4, //Llatitude in decimal degrees.
+            longitude       : 4, //Longitude in decimal degrees.
+            altitude        : 0, //Altitude in meters
+            accuracy        : 0, //Accuracy of the latitude and longitude properties, expressed in meters.
+            altitudeAccuracy: 1, //Accuracy of the altitude expressed in meters. This value can be null.
+            heading         : 0, //Specified in degrees
+            speed           : 1  //Velocity of the device in meters per second.
         },
 
         update: function( coords = {}, onlyHandler ){
@@ -299,34 +312,60 @@ window.geolocation.GeolocationHandler:
                     this.timeoutId = null;
                 }
 
+
+                var lastCoords = this.lastCoords = this.coords,
+                    newCoords = this.coords = $.extend({}, coords),
+                    changed = false;
+
+                //Round all values
+                $.each(this.roundToDecimals, function(id, decimals){
+                    if (typeof newCoords[id] == 'number')
+                        newCoords[id] = +(Math.round(newCoords[id] + "e+"+decimals)  + "e-"+decimals);
+                });
+
+                //Check if any is changed
+                $.each(newCoords, function(id, value){
+                    if (lastCoords[id] !== value){
+                        changed = true;
+                        return false;
+                    }
+                });
+
+                if (changed)
+                    this.updateNo++;
+
                 //Update coords
-                coords.latitude = coords.latitude || coords.lat || null;
-                coords.lat      = coords.lat || coords.latitude || null;
+                newCoords.latitude = newCoords.latitude || newCoords.lat || null;
+                newCoords.lat      = newCoords.lat || newCoords.latitude || null;
 
-                coords.longitude = coords.longitude || coords.lng || null;
-                coords.lng       = coords.lng || coords.longitude || null;
+                newCoords.longitude = newCoords.longitude || newCoords.lng || null;
+                newCoords.lng       = newCoords.lng || newCoords.longitude || null;
 
-                if (window.L && window.L.LatLng && (coords.lat !== null) && (coords.lng !== null))
-                    coords.latLng = new window.L.LatLng(coords.lat, coords.lng);
+                if (window.L && window.L.LatLng && (newCoords.lat !== null) && (newCoords.lng !== null))
+                    newCoords.latLng = new window.L.LatLng(newCoords.lat, newCoords.lng);
                 else
-                    coords.latLng = null;
+                    newCoords.latLng = null;
+
 
                 //Update all values. Value of id X is only updated if the new coords set the value to undefined by having coords.X === null, else the value is not changed
                 var _this = this;
-                $.each(this.coords, function(id){
-                    if (coords[id] || (coords[id] === 0) || (coords[id] === null))
-                        _this.coords[id] = coords[id];
-                });
+//HER                $.each(this.coords, function(id){
+//HER                    if (coords[id] || (coords[id] === 0) || (coords[id] === null))
+//HER                        _this.coords[id] = coords[id];
+//HER                });
 
             }
 
+//console.log(changed, lastCoords, newCoords);
+
             //Update all or given handler(s)
-            var handlers = onlyHandler ? [onlyHandler] : this.geolocationHandlers,
-                this_coords = this.coords;
+            var handlers = onlyHandler ? [onlyHandler] : this.geolocationHandlers;
 
             $.each(handlers, function(id, geolocationHandler) {
-                if (geolocationHandler.setCoords)
-                    geolocationHandler.setCoords( this_coords );
+                if (geolocationHandler.setCoords && (geolocationHandler.glh_updateNo != _this.updateNo)){
+                    geolocationHandler.glh_updateNo = _this.updateNo;
+                    geolocationHandler.setCoords( newCoords );
+                }
             });
 
             if (coords && this.maximumAge)
@@ -366,6 +405,105 @@ window.geolocation.GeolocationHandler:
         }
     };
 
+
+}(jQuery, this/*, document*/));
+
+
+;
+/****************************************************************************
+geolocation-standard.js
+
+Creates window.geolocation.provider = version of GeolocationProvider that
+provides location from the browser geolocation API
+
+****************************************************************************/
+
+(function ($, window/*, document, undefined*/) {
+    "use strict";
+
+    //Create namespaces
+    var ns = window.geolocation = window.geolocation || {};
+
+    var geolocationOptions = {
+        /* From https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/getCurrentPosition */
+
+        /*
+        maximumAge:
+            Is a positive long value indicating the maximum age in milliseconds of a possible cached position that is acceptable to return.
+            If set to 0, it means that the device cannot use a cached position and must attempt to retrieve the real current position.
+            If set to Infinity the device must return a cached position regardless of its age. Default: 0.
+        */
+        //maximumAge          : 10 * 1000, //Allow 10sec old position
+
+        /*
+        timeout:
+            Is a positive long value representing the maximum length of time (in milliseconds) the device is allowed to take in order to return a position.
+            The default value is Infinity, meaning that getCurrentPosition() won't return until the position is available.
+        */
+        //timeout             : 10 * 1000,
+
+        /*
+        enableHighAccuracy:
+            Is a boolean value that indicates the application would like to receive the best possible results.
+            If true and if the device is able to provide a more accurate position, it will do so.
+            Note that this can result in slower response times or increased power consumption (with a GPS chip on a mobile device for example).
+            On the other hand, if false, the device can take the liberty to save resources by responding more quickly and/or using less power. Default: false.
+        */
+        enableHighAccuracy  : true
+    };
+
+    /*
+    GeolocationPosition = {
+        coords   : GeolocationCoordinates
+        timestamp: Millisecond
+
+    From https://developer.mozilla.org/en-US/docs/Web/API/GeolocationCoordinates:
+    GeolocationCoordinates = {
+        latitude        : Position's latitude in decimal degrees.
+        longitude       : Position's longitude in decimal degrees.
+        altitude        : Position's altitude in meters, relative to sea level. This value can be null if the implementation cannot provide the data.
+        accuracy        : Accuracy of the latitude and longitude properties, expressed in meters.
+        altitudeAccuracy: Accuracy of the altitude expressed in meters. This value can be null.
+        heading         : Direction towards which the device is facing. This value, specified in degrees, indicates how far off from heading true north the device is. 0 degrees represents true north, and the direction is determined clockwise (which means that east is 90 degrees and west is 270 degrees). If speed is 0, heading is NaN. If the device is unable to provide heading information, this value is null.
+        speed           : Velocity of the device in meters per second. This value can be null.
+    }
+    All properties are double
+    */
+
+
+    var Provider = function(){
+            this.lastCoords = {};
+            ns.GeolocationProvider.call(this, geolocationOptions);
+        };
+
+    Provider.prototype = Object.create(ns.GeolocationProvider.prototype);
+
+
+    $.extend(Provider.prototype, {
+        activate: function(){
+            this._success = this._success || $.proxy(this.success, this);
+            this._error   = this._error   || $.proxy(this.onError, this);
+
+            if (navigator.geolocation)
+                navigator.geolocation.watchPosition(this._success, this._error, geolocationOptions);
+            else
+                this.onError(4);
+        },
+
+
+        deactivate: function(){
+            if (navigator.geolocation)
+                navigator.clearWatch();
+        },
+
+        success: function( GeolocationPosition ){
+            this.update( GeolocationPosition.coords );
+        },
+
+    });
+
+    //Create window.geolocation.provider
+    ns.provider = new Provider();
 
 }(jQuery, this/*, document*/));
 

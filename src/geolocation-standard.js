@@ -62,7 +62,7 @@ provides location from the browser geolocation API
     var Provider = function(){
             this.lastCoords = {};
             ns.GeolocationProvider.call(this, geolocationOptions);
-        }
+        };
 
     Provider.prototype = Object.create(ns.GeolocationProvider.prototype);
 
@@ -87,67 +87,6 @@ provides location from the browser geolocation API
         success: function( GeolocationPosition ){
             this.update( GeolocationPosition.coords );
         },
-
-
-
-
-
-/*
-var timestamp = 0;
-    function niels( geolocationPosition ){
-
-console.log(geolocationPosition);
-        if (timestamp == geolocationPosition.timestamp) return;
-
-        timestamp = geolocationPosition.timestamp;
-
-        var c = geolocationPosition.coords;
-        window.notyInfo(
-            'VERSION: 0.0.10<br>'+
-            'latitude:'+c.latitude+'<br>'+
-            'longitude:'+c.longitude+'<br>'+
-            'altitude:'+c.altitude+'<br>'+
-            'accuracy:'+c.accuracy+'<br>'+
-            'altitudeAccuracy:'+c.altitudeAccuracy+'<br>'+
-            'heading:'+c.heading+'<br>'+
-            'speed:'+c.speed+'<br>'+
-            'window.deviceOrientation:'+window.deviceOrientation,
-            {killer: true}
-        );
-    }
-*/
-//HER    if (navigator.geolocation) {
-//HER        navigator.geolocation.watchPosition(niels, error, geolocationOptions);
-
-//HER        navigator.geolocation.getCurrentPosition(niels, error, geolocationOptions);
-//HER        navigator.geolocation.getCurrentPosition(niels, error, geolocationOptions);
-
-//HER        window.setTimeout(function(){
-//HER            navigator.geolocation.getCurrentPosition(niels, error, geolocationOptions);
-//HER        }, 12000);
-
-//HER    }
-//HER    else {
-        //console.log("Geolocation is not supported by this browser.");
-//HER    }
-
-
-//this._map.on('locationfound', this._onLocationFound, this);
-
-
-//    L.Map.prototype
-
-
-
-//HER    L.Map.mergeOptions({
-//HER        deviceLocate: false,
-//HER        bsZoomOptions: {}
-//HER    });
-
-//HER    L.Map.addInitHook(function () {
-//HER        if (this.options.deviceLocate) {
-//HER        }
-//HER    });
 
     });
 
