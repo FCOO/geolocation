@@ -172,6 +172,7 @@ window.geolocation.GeolocationHandler:
         },
 
         update: function( coords = {}, onlyHandler ){
+            var _this = this;
             if (coords){
                 this.statusOk = true;
 
@@ -216,16 +217,14 @@ window.geolocation.GeolocationHandler:
                     newCoords.latLng = null;
 
 
-                //Update all values. Value of id X is only updated if the new coords set the value to undefined by having coords.X === null, else the value is not changed
-                var _this = this;
-//HER                $.each(this.coords, function(id){
-//HER                    if (coords[id] || (coords[id] === 0) || (coords[id] === null))
-//HER                        _this.coords[id] = coords[id];
-//HER                });
-
+                //TODO: Needed? - Update all values. Value of id X is only updated if the new coords set the value to undefined by having coords.X === null, else the value is not changed
+                /*
+                $.each(this.coords, function(id){
+                    if (coords[id] || (coords[id] === 0) || (coords[id] === null))
+                        _this.coords[id] = coords[id];
+                });
+                */
             }
-
-//console.log(changed, lastCoords, newCoords);
 
             //Update all or given handler(s)
             var handlers = onlyHandler ? [onlyHandler] : this.geolocationHandlers;
