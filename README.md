@@ -23,7 +23,7 @@ http://FCOO.github.io/geolocation/demo/
 There are two events regarding device orientation
 
 - [deviceorientation](https://developer.mozilla.org/en-US/docs/Web/Events/Detecting_device_orientation)
-- [compassneedscalibration](https://www.w3.org/TR/orientation-event/#compassneedscalibration)
+- [compassneedscalibration](https://www.w3.org/TR/orientation-event/#compassneedscalibration) ** NOT IMPLEMENTED **
 
 The different browser do not handle this events the same way. Therefor there are methods to add and remove event-handlers for this events.
 Safari on iOS doesn't implement the spec correctly, because alpha is arbitrary instead of relative to true north.
@@ -31,8 +31,8 @@ Safari instead offers `webkitCompassHeading`, which has the opposite sign to alp
 `DeviceOrientationEvent.beta` has values between -90 and 90 on mobile Safari and between 180 and -180 on Firefox.
 `DeviceOrientationEvent.gamma` has values between -180 and 180 on mobile Safari and between 90 and -90 on Firefox.
 
-Se details for 
-[Firefox, Chrome](https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent) and 
+Se details for
+[Firefox, Chrome](https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent) and
 [Safari](https://developer.apple.com/documentation/webkitjs/deviceorientationevent#//apple_ref/javascript/instp/DeviceOrientationEvent/beta)
 
 
@@ -69,14 +69,14 @@ Different inherrited versions are created for geolocation, AIS, manual entering 
 
         new window.geolocation.GeolocationProvider( options )
         options = {
-            maximumAge: DOUBLE - Maximum age of last coords before a update with coords = {}NULL is called. 
+            maximumAge: DOUBLE - Maximum age of last coords before a update with coords = {}NULL is called.
                                  Defalut = 0 => no coords are to old
         }
 
         Methods:
             .add   : function( geolocationHandler ) //Add geolocationHandler to the handler
             .remove: function( geolocationHandler ) //Remove geolocationHandler from the handler
-       
+
 
 
 #### `window.geolocation.GeolocationHandler`
@@ -94,13 +94,13 @@ Abstract class that must contain the following methods:
         longitude        : Position's longitude in decimal degrees.
         lng              : As longitude
         latLng           : Leaflet LatLng-object - only if Leaflet is included
-        altitude         : Position's altitude in meters, relative to sea level. This value can be null if the 
+        altitude         : Position's altitude in meters, relative to sea level. This value can be null if the
                             implementation cannot provide the data.
         accuracy         : Accuracy of the latitude and longitude properties, expressed in meters.
         altitudeAccuracy : Accuracy of the altitude expressed in meters. This value can be null.
         heading          : Direction towards which the device is facing. This value, specified in degrees, indicates how far
                             off from heading true north the device is.
-                           0 degrees represents true north, and the direction is determined clockwise (which means that east 
+                           0 degrees represents true north, and the direction is determined clockwise (which means that east
                             is 90 degrees and west is 270 degrees).
                            If speed is 0, heading is NaN. If the device is unable to provide heading information,
                             this value is null.
@@ -115,17 +115,17 @@ Abstract class that must contain the following methods:
             beta                : NUMBER or null,
             gamma               : NUMBER or null,
         }
-    
+
 #### `error`
 `error` = Must contain the following properties taken from [GeolocationPositionError](https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPositionError)
 
     error = {
         code: Returns an unsigned short representing the error code. The following values are possible:
-            1   PERMISSION_DENIED       The acquisition of the geolocation information failed because 
+            1   PERMISSION_DENIED       The acquisition of the geolocation information failed because
                                         the page didn't have the permission to do it.
-            2   POSITION_UNAVAILABLE    The acquisition of the geolocation failed because at least one internal 
+            2   POSITION_UNAVAILABLE    The acquisition of the geolocation failed because at least one internal
                                         source of position returned an internal error.
-            3   TIMEOUT                 The time allowed to acquire the geolocation was reached before the information 
+            3   TIMEOUT                 The time allowed to acquire the geolocation was reached before the information
                                         was obtained.
             4   OLD                     The last coordinates are now to old acoording to options.maximumAge
 
@@ -135,9 +135,9 @@ Abstract class that must contain the following methods:
 
 ### Standard Geolocation-provider for browser geolocation API
 
-    window.geolocation.provider: GeolocationProvider 
+    window.geolocation.provider: GeolocationProvider
 
-A `GeolocationProvider` that provides location, altitude, speed, and heading from the browser standard geolocation API  
+A `GeolocationProvider` that provides location, altitude, speed, and heading from the browser standard geolocation API
 
 #### Exsample
     var myHandler = {
@@ -145,8 +145,8 @@ A `GeolocationProvider` that provides location, altitude, speed, and heading fro
                 //De something with coords
             }
         };
-    window.geolocation.provider.add( myHandler ); 
-    
+    window.geolocation.provider.add( myHandler );
+
 
 
 ## Copyright and License

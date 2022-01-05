@@ -28,7 +28,7 @@
     <script>
         var ns = window.geolocation;
         var count = 0;
-        ns.onDeviceorientation( function( event ){
+        var testOnDeviceOrientation= function( event ){
             var $div = $('.device'), 
                 html = 'DEVICE ORIENTATION v. 1.0.0 (' + (count++ % 10) + ')';
 
@@ -38,7 +38,8 @@
             });
 
             $div.html(html);
-        });
+        };
+        ns.onDeviceorientation(testOnDeviceOrientation);
 
         var locationCount = 0;
         var testHandler = {

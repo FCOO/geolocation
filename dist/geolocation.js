@@ -14,19 +14,17 @@ Define global events to handle device orientation and calibration
     /***********************************************************
     There are two events:
         deviceorientation
-        compassneedscalibration
+        compassneedscalibration - NOT USED FOR NOW
 
     To add events-handler to these events use
         window.geolocation.onDeviceorientation( fn: FUNCTION[, context: OBJECT] )
-        window.geolocation.onCompassneedscalibration( fn: FUNCTION[, context: OBJECT] )
+        NOT IMPLEMENTED: window.geolocation.onCompassneedscalibration( fn: FUNCTION[, context: OBJECT] )
 
     To remove events-handler to these events use
         window.geolocation.offDeviceorientation( fn: FUNCTION[, context: OBJECT] )
-        window.geolocation.offCompassneedscalibration( fn: FUNCTION[, context: OBJECT] )
+        NOT IMPLEMENTED: window.geolocation.offCompassneedscalibration( fn: FUNCTION[, context: OBJECT] )
     ***********************************************************/
-    var onDeviceorientationList = {},
-        onCompassneedscalibrationList = {},
-        lastId = 0;
+    var lastId = 0;
 
     function stamp(obj) {
         /*eslint-disable */
@@ -35,29 +33,51 @@ Define global events to handle device orientation and calibration
         /* eslint-enable */
     }
 
-    function addToList(list, fn, context){
-        var id = stamp(fn) + (context ? '_' + stamp(context) : '');
-        list[id] = list[id] || {fn: fn, context: context};
-    }
 
-    function removeFromList(list, fn, context){
-        var id = stamp(fn) + (context ? '_' + stamp(context) : '');
-        list[id] = null;
-    }
+    var EventList = function(){
+            this.isActive = false;
+            this.lastEvent = {};
+            this.added = 0;
+            this.list = {};
+        };
 
+    EventList.prototype = {
+        add: function(fn, context){
+            var id = stamp(fn) + (context ? '_' + stamp(context) : '');
+            if (!this.list[id]){
+                this.added++;
+                this.list[id] = {fn: fn, context: context};
+            }
 
-    function triggerList(list, event){
-        $.each(list, function(id, fn_context){
-            if (fn_context)
-                fn_context.fn.call(fn_context.context, event);
-        });
-    }
+            if (this.added == 1)
+                this.activate();
+            else
+                this.list[id].fn.call(this.list[id].context, this.lastEvent);
+        },
 
-    ns.onDeviceorientation       = function( fn, context ){ addToList( onDeviceorientationList,       fn, context ); };
-    ns.onCompassneedscalibration = function( fn, context ){ addToList( onCompassneedscalibrationList, fn, context ); };
+        remove: function(fn, context){
+            var id = stamp(fn) + (context ? '_' + stamp(context) : '');
+            if (this.list[id]){
+                this.list[id] = null;
+                this.added--;
+                if (this.added == 0)
+                    this.deactivate();
+            }
+        },
 
-    ns.offDeviceorientation       = function( fn, context ){ removeFromList( onDeviceorientationList,       fn, context ); };
-    ns.offCompassneedscalibration = function( fn, context ){ removeFromList( onCompassneedscalibrationList, fn, context ); };
+        trigger: function (event){
+            this.lastEvent = event;
+            $.each(this.list, function(id, fn_context){
+                if (fn_context)
+                    fn_context.fn.call(fn_context.context, event);
+            });
+        },
+
+        activate  : function(){},
+        deactivate: function(){}
+
+    };
+
 
 
     /***********************************************************************
@@ -75,54 +95,96 @@ Define global events to handle device orientation and calibration
 
 
     ***********************************************************************/
-    function onDeviceOrientation(jquery_event) {
-        var event    = jquery_event.originalEvent,
-            newEvent = {},
-            deviceorientation = null;
+    var deviceOrientationEventName =
+            'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' :
+            'ondeviceorientation' in window ? 'deviceorientation' :
+            null;
 
-        if (event.webkitCompassHeading)
-            // iOS
-            deviceorientation = event.webkitCompassHeading;
-        else
-            if (event.absolute && event.alpha)
-                // Android
-                deviceorientation = 360 - parseInt(event.alpha);
+    var onDeviceorientationList = new EventList();
+    $.extend(onDeviceorientationList, {
+        activate: function(){
+            if (deviceOrientationEventName){
+                var self_event_handler = this.self_event_handler = this.self_event_handler || $.proxy(this.onDeviceorientation, this),
+                    add_event_deviceorientation = function() {
+                        $(window).on(deviceOrientationEventName, self_event_handler);
+                    };
 
-        event.deviceorientation = deviceorientation;
-
-        $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
-            newEvent[id] = typeof event[id] == 'number' ? Math.round(event[id]) : event[id];
-        });
-
-        triggerList(onDeviceorientationList, newEvent);
-    }
-
-    //Set correct event
-    var oriAbs = 'ondeviceorientationabsolute' in window;
-    if (oriAbs || ('ondeviceorientation' in window)) {
-
-        var add_event_deviceorientation = function() {
-            $(window).on(oriAbs ? 'deviceorientationabsolute' : 'deviceorientation', onDeviceOrientation);
-        };
-
-        if (DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')
-            DeviceOrientationEvent.requestPermission().then(function (permissionState) {
-                if (permissionState === 'granted')
+                if (DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')
+                    DeviceOrientationEvent.requestPermission().then(function (permissionState) {
+                        if (permissionState === 'granted')
+                            add_event_deviceorientation();
+                    });
+                else
                     add_event_deviceorientation();
+            }
+            else
+                this.trigger({});
+        },
+
+        deactivate: function(){
+            $(window).off(deviceOrientationEventName, this.self_event_handler);
+        },
+
+        onDeviceorientation: function(jquery_event) {
+            var event    = jquery_event.originalEvent,
+                newEvent = {},
+                deviceorientation = null;
+
+            if (event.webkitCompassHeading)
+                // iOS
+                deviceorientation = event.webkitCompassHeading;
+            else
+                if (event.absolute && event.alpha)
+                    // Android
+                    deviceorientation = 360 - parseInt(event.alpha);
+
+            event.deviceorientation = deviceorientation;
+
+            $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
+                newEvent[id] = typeof event[id] == 'number' ? Math.round(event[id]) : event[id];
             });
-        else
-            add_event_deviceorientation();
+
+            this.trigger(newEvent);
+        }
+    });
+
+
+
+    ns.onDeviceorientation = function( fn, context ){
+        onDeviceorientationList.add( fn, context );
+    };
+
+    ns.offDeviceorientation = function( fn, context ){
+        onDeviceorientationList.remove( fn, context );
+    };
+
+
+    /*******************************************************************
+    COMPASS NEEDS CALIBRATION - NOT IMPLEMENTED
+    *******************************************************************/
+    /*
+    var onCompassneedscalibrationList = new EventList();
+    $.extend(onCompassneedscalibrationList, {
+        activate: function(){
+
+        },
+
+        deactivate: function(){
+
+        }
     }
 
+    ns.offCompassneedscalibration = function( fn, context ){
+        onCompassneedscalibrationList.add( fn, context );
+    };
+    ns.onCompassneedscalibration = function( fn, context ){
+        onCompassneedscalibrationList.remove( fn, context );
+    };
+    */
 
-
-
-    /**********************************
-    COMPASS NEEDS CALIBRATION
-    ***********************************/
-    $(window).on('compassneedscalibration', function(event){
-        triggerList(onCompassneedscalibrationList, event);
-    });
+    //$(window).on('compassneedscalibration', function(event){
+    //    triggerList(onCompassneedscalibrationList, event);
+    //});
 
 
 }(jQuery, this/*, document*/));
