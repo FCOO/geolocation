@@ -36,7 +36,15 @@ Se details for
 [Safari](https://developer.apple.com/documentation/webkitjs/deviceorientationevent#//apple_ref/javascript/instp/DeviceOrientationEvent/beta)
 
 
+#### Screen Orientation
 
+The record returned by the event-handler includes two values from [The Screen Orientation API](https://w3c.github.io/screen-orientation/#widl-ScreenOrientation-lock-Promise-void--OrientationLockType-orientation): `angle` and `type`
+
+
+
+This package using the ponyfill [o9n v. 2.1.1](https://github.com/chmanie/o9n) by [Christian Maniewski](https://github.com/chmanie) to get the values on different browsers
+
+#### Use and formats
      To add events-handler to these events use
         window.geolocation.onDeviceorientation( fn: FUNCTION(EVENT)[, context: OBJECT] )
         window.geolocation.onCompassneedscalibration( fn: FUNCTION(EVENT)[, context: OBJECT] )
@@ -52,6 +60,10 @@ Se details for
         alpha               : NUMBER or null,
         beta                : NUMBER or null,
         gamma               : NUMBER or null,
+
+        angle               : NUMBER or null,
+        type                : STRING or null    //Values = "portrait-primary", "portrait-secondary", 
+                                                //         "landscape-primary", or "landscape-secondary"
     }
 
 See [description of EVENT elements](https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent)
@@ -105,16 +117,6 @@ Abstract class that must contain the following methods:
                            If speed is 0, heading is NaN. If the device is unable to provide heading information,
                             this value is null.
         speed            : Velocity of the device in meters per second. This value can be null.
-
-        If the GeolocationProvider also detects device orientation (see above) the following values are included.
-        deviceOrientation: {
-            absolute            : BOOLEAN,
-            deviceorientation   : NUMBER or null,
-            webkitCompassHeading: NUMBER or null,
-            alpha               : NUMBER or null,
-            beta                : NUMBER or null,
-            gamma               : NUMBER or null,
-        }
 
 #### `error`
 `error` = Must contain the following properties taken from [GeolocationPositionError](https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPositionError)
