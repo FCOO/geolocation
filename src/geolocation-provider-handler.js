@@ -38,18 +38,6 @@ window.geolocation.GeolocationHandler:
                            If speed is 0, heading is NaN. If the device is unable to provide heading information, this value is null.
         speed            : Velocity of the device in meters per second. This value can be null.
 
-        If the GeolocationProvider also detects device orientation the following values are included.
-        See src/geolocation-device-orientation-events.js and https://developers.google.com/web/fundamentals/native-hardware/device-orientation for details.
-        deviceOrientation: {
-            absolute            : BOOLEAN,
-            deviceorientation   : NUMBER or null,
-            webkitCompassHeading: NUMBER or null,
-            alpha               : NUMBER or null,
-            beta                : NUMBER or null,
-            gamma               : NUMBER or null
-        }
-
-
     error = Must contain the following properties taken from GeolocationPositionError (see https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPositionError)
         code: Returns an unsigned short representing the error code. The following values are possible:
             1   PERMISSION_DENIED       The acquisition of the geolocation information failed because the page didn't have the permission to do it.

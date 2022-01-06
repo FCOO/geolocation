@@ -31,18 +31,11 @@
         var count = 0;
         var testOnDeviceOrientation= function( event ){
             var $div = $('.device'), 
-                html = 'DEVICE ORIENTATION v. 1.1.0 (' + (count++ % 10) + ')';
+                html = 'DEVICE ORIENTATION v. 1.1.2 (' + (count++ % 10) + ')';
 
-            $.each(['absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
-                //html = html + '<br>' + id + ': ' + (typeof event[id] == 'number' ? Math.round(event[id]) : event[id]);
+            $.each(['angle', 'type', 'absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
                 html = html + '<br>' + id + ': ' + event[id];
             });
-
-            var screenOrientation = window.o9n.getOrientation();
-            html = html + 
-                    '<br>angle = ' + screenOrientation.angle + 
-                    '<br>type = ' + screenOrientation.type; 
-
 
             $div.html(html);
         };
