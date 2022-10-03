@@ -1,5 +1,1479 @@
+/**
+ *
+ * FULL TILT
+ * http://github.com/richtr/Full-Tilt
+ *
+ * A standalone DeviceOrientation + DeviceMotion JavaScript library that
+ * normalises orientation sensor input, applies relevant screen orientation
+ * transforms, returns Euler Angle, Quaternion and Rotation
+ * Matrix representations back to web developers and provides conversion
+ * between all supported orientation representation types.
+ *
+ * Copyright: 2014 Rich Tibbett
+ * License:   MIT
+ *
+ */
+
+(function ( window ) {
+
+// Only initialize the FULLTILT API if it is not already attached to the DOM
+if ( window.FULLTILT !== undefined && window.FULLTILT !== null ) {
+	return;
+}
+
+var M_PI   = Math.PI;
+var M_PI_2 = M_PI / 2;
+var M_2_PI = 2 * M_PI;
+
+// Degree to Radian conversion
+var degToRad = M_PI / 180;
+var radToDeg = 180 / M_PI;
+
+// Internal device orientation + motion variables
+var sensors = {
+	"orientation": {
+		active:    false,
+		callbacks: [],
+		data:      undefined
+	},
+	"motion": {
+		active:    false,
+		callbacks: [],
+		data:      undefined
+	}
+};
+var screenActive = false;
+
+// Internal screen orientation variables
+var hasScreenOrientationAPI = window.screen && window.screen.orientation && window.screen.orientation.angle !== undefined && window.screen.orientation.angle !== null ? true : false;
+var screenOrientationAngle = ( hasScreenOrientationAPI ? window.screen.orientation.angle : ( window.orientation || 0 ) ) * degToRad;
+
+var SCREEN_ROTATION_0        = 0,
+    SCREEN_ROTATION_90       = M_PI_2,
+    SCREEN_ROTATION_180      = M_PI,
+    SCREEN_ROTATION_270      = M_2_PI / 3,
+    SCREEN_ROTATION_MINUS_90 = - M_PI_2;
+
+// Math.sign polyfill
+function sign(x) {
+	x = +x; // convert to a number
+	if (x === 0 || isNaN(x))
+		return x;
+	return x > 0 ? 1 : -1;
+}
+
+///// Promise-based Sensor Data checker //////
+
+function SensorCheck(sensorRootObj) {
+
+	var promise = new Promise(function(resolve, reject) {
+
+		var runCheck = function (tries) {
+
+			setTimeout(function() {
+
+				if (sensorRootObj && sensorRootObj.data) {
+
+					resolve();
+
+				} else if (tries >= 20) {
+
+					reject();
+
+				} else {
+
+					runCheck(++tries);
+
+				}
+
+			}, 50);
+
+		};
+
+		runCheck(0);
+
+	});
+
+	return promise;
+
+}
+
+////// Internal Event Handlers //////
+
+function handleScreenOrientationChange () {
+
+	if ( hasScreenOrientationAPI ) {
+
+		screenOrientationAngle = ( window.screen.orientation.angle || 0 ) * degToRad;
+
+	} else {
+
+		screenOrientationAngle = ( window.orientation || 0 ) * degToRad;
+
+	}
+
+}
+
+function handleDeviceOrientationChange ( event ) {
+
+	sensors.orientation.data = event;
+
+	// Fire every callback function each time deviceorientation is updated
+	for ( var i in sensors.orientation.callbacks ) {
+
+		sensors.orientation.callbacks[ i ].call( this );
+
+	}
+
+}
+
+function handleDeviceMotionChange ( event ) {
+
+	sensors.motion.data = event;
+
+	// Fire every callback function each time devicemotion is updated
+	for ( var i in sensors.motion.callbacks ) {
+
+		sensors.motion.callbacks[ i ].call( this );
+
+	}
+
+}
+
+///// FULLTILT API Root Object /////
+
+var FULLTILT = {};
+
+FULLTILT.version = "0.5.3";
+
+///// FULLTILT API Root Methods /////
+
+FULLTILT.getDeviceOrientation = function(options) {
+
+	var promise = new Promise(function(resolve, reject) {
+
+		var control = new FULLTILT.DeviceOrientation(options);
+
+		control.start();
+
+		var orientationSensorCheck = new SensorCheck(sensors.orientation);
+
+		orientationSensorCheck.then(function() {
+
+			control._alphaAvailable = (sensors.orientation.data.alpha && sensors.orientation.data.alpha !== null);
+			control._betaAvailable = (sensors.orientation.data.beta && sensors.orientation.data.beta !== null);
+			control._gammaAvailable = (sensors.orientation.data.gamma && sensors.orientation.data.gamma !== null);
+
+			resolve(control);
+
+		}).catch(function() {
+
+			control.stop();
+			reject('DeviceOrientation is not supported');
+
+		});
+
+	});
+
+	return promise;
+
+};
+
+FULLTILT.getDeviceMotion = function(options) {
+
+	var promise = new Promise(function(resolve, reject) {
+
+		var control = new FULLTILT.DeviceMotion(options);
+
+		control.start();
+
+		var motionSensorCheck = new SensorCheck(sensors.motion);
+
+		motionSensorCheck.then(function() {
+
+			control._accelerationXAvailable = (sensors.motion.data.acceleration && sensors.motion.data.acceleration.x);
+			control._accelerationYAvailable = (sensors.motion.data.acceleration && sensors.motion.data.acceleration.y);
+			control._accelerationZAvailable = (sensors.motion.data.acceleration && sensors.motion.data.acceleration.z);
+
+			control._accelerationIncludingGravityXAvailable = (sensors.motion.data.accelerationIncludingGravity && sensors.motion.data.accelerationIncludingGravity.x);
+			control._accelerationIncludingGravityYAvailable = (sensors.motion.data.accelerationIncludingGravity && sensors.motion.data.accelerationIncludingGravity.y);
+			control._accelerationIncludingGravityZAvailable = (sensors.motion.data.accelerationIncludingGravity && sensors.motion.data.accelerationIncludingGravity.z);
+
+			control._rotationRateAlphaAvailable = (sensors.motion.data.rotationRate && sensors.motion.data.rotationRate.alpha);
+			control._rotationRateBetaAvailable = (sensors.motion.data.rotationRate && sensors.motion.data.rotationRate.beta);
+			control._rotationRateGammaAvailable = (sensors.motion.data.rotationRate && sensors.motion.data.rotationRate.gamma);
+
+			resolve(control);
+
+		}).catch(function() {
+
+			control.stop();
+			reject('DeviceMotion is not supported');
+
+		});
+
+	});
+
+	return promise;
+
+};
+
+
+////// FULLTILT.Quaternion //////
+
+FULLTILT.Quaternion = function ( x, y, z, w ) {
+
+	var quat, outQuat;
+
+	this.set = function ( x, y, z, w ) {
+
+		this.x = x || 0;
+		this.y = y || 0;
+		this.z = z || 0;
+		this.w = w || 1;
+
+	};
+
+	this.copy = function ( quaternion ) {
+
+		this.x = quaternion.x;
+		this.y = quaternion.y;
+		this.z = quaternion.z;
+		this.w = quaternion.w;
+
+	};
+
+	this.setFromEuler = (function () {
+
+		var _x, _y, _z;
+		var _x_2, _y_2, _z_2;
+		var cX, cY, cZ, sX, sY, sZ;
+
+		return function ( euler ) {
+
+			euler = euler || {};
+
+			_z = ( euler.alpha || 0 ) * degToRad;
+			_x = ( euler.beta || 0 ) * degToRad;
+			_y = ( euler.gamma || 0 ) * degToRad;
+
+			_z_2 = _z / 2;
+			_x_2 = _x / 2;
+			_y_2 = _y / 2;
+
+			cX = Math.cos( _x_2 );
+			cY = Math.cos( _y_2 );
+			cZ = Math.cos( _z_2 );
+			sX = Math.sin( _x_2 );
+			sY = Math.sin( _y_2 );
+			sZ = Math.sin( _z_2 );
+
+			this.set(
+				sX * cY * cZ - cX * sY * sZ, // x
+				cX * sY * cZ + sX * cY * sZ, // y
+				cX * cY * sZ + sX * sY * cZ, // z
+				cX * cY * cZ - sX * sY * sZ  // w
+			);
+
+			this.normalize();
+
+			return this;
+
+		};
+
+	})();
+
+	this.setFromRotationMatrix = (function () {
+
+		var R;
+
+		return function( matrix ) {
+
+			R = matrix.elements;
+
+			this.set(
+				0.5 * Math.sqrt( 1 + R[0] - R[4] - R[8] ) * sign( R[7] - R[5] ), // x
+				0.5 * Math.sqrt( 1 - R[0] + R[4] - R[8] ) * sign( R[2] - R[6] ), // y
+				0.5 * Math.sqrt( 1 - R[0] - R[4] + R[8] ) * sign( R[3] - R[1] ), // z
+				0.5 * Math.sqrt( 1 + R[0] + R[4] + R[8] )                        // w
+			);
+
+			return this;
+
+		};
+
+	})();
+
+	this.multiply = function ( quaternion ) {
+
+		outQuat = FULLTILT.Quaternion.prototype.multiplyQuaternions( this, quaternion );
+		this.copy( outQuat );
+
+		return this;
+
+	};
+
+	this.rotateX = function ( angle ) {
+
+		outQuat = FULLTILT.Quaternion.prototype.rotateByAxisAngle( this, [ 1, 0, 0 ], angle );
+		this.copy( outQuat );
+
+		return this;
+
+	};
+
+	this.rotateY = function ( angle ) {
+
+		outQuat = FULLTILT.Quaternion.prototype.rotateByAxisAngle( this, [ 0, 1, 0 ], angle );
+		this.copy( outQuat );
+
+		return this;
+
+	};
+
+	this.rotateZ = function ( angle ) {
+
+		outQuat = FULLTILT.Quaternion.prototype.rotateByAxisAngle( this, [ 0, 0, 1 ], angle );
+		this.copy( outQuat );
+
+		return this;
+
+	};
+
+	this.normalize = function () {
+
+		return FULLTILT.Quaternion.prototype.normalize( this );
+
+	};
+
+	// Initialize object values
+	this.set( x, y, z, w );
+
+};
+
+FULLTILT.Quaternion.prototype = {
+
+	constructor: FULLTILT.Quaternion,
+
+	multiplyQuaternions: function () {
+
+		var multipliedQuat = new FULLTILT.Quaternion();
+
+		return function ( a, b ) {
+
+			var qax = a.x, qay = a.y, qaz = a.z, qaw = a.w;
+			var qbx = b.x, qby = b.y, qbz = b.z, qbw = b.w;
+
+			multipliedQuat.set(
+				qax * qbw + qaw * qbx + qay * qbz - qaz * qby, // x
+				qay * qbw + qaw * qby + qaz * qbx - qax * qbz, // y
+				qaz * qbw + qaw * qbz + qax * qby - qay * qbx, // z
+				qaw * qbw - qax * qbx - qay * qby - qaz * qbz  // w
+			);
+
+			return multipliedQuat;
+
+		};
+
+	}(),
+
+	normalize: function( q ) {
+
+		var len = Math.sqrt( q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w );
+
+		if ( len === 0 ) {
+
+			q.x = 0;
+			q.y = 0;
+			q.z = 0;
+			q.w = 1;
+
+		} else {
+
+			len = 1 / len;
+
+			q.x *= len;
+			q.y *= len;
+			q.z *= len;
+			q.w *= len;
+
+		}
+
+		return q;
+
+	},
+
+	rotateByAxisAngle: function () {
+
+		var outputQuaternion = new FULLTILT.Quaternion();
+		var transformQuaternion = new FULLTILT.Quaternion();
+
+		var halfAngle, sA;
+
+		return function ( targetQuaternion, axis, angle ) {
+
+			halfAngle = ( angle || 0 ) / 2;
+			sA = Math.sin( halfAngle );
+
+			transformQuaternion.set(
+				( axis[ 0 ] || 0 ) * sA, // x
+				( axis[ 1 ] || 0 ) * sA, // y
+				( axis[ 2 ] || 0 ) * sA, // z
+				Math.cos( halfAngle )    // w
+			);
+
+			// Multiply quaternion by q
+			outputQuaternion = FULLTILT.Quaternion.prototype.multiplyQuaternions( targetQuaternion, transformQuaternion );
+
+			return FULLTILT.Quaternion.prototype.normalize( outputQuaternion );
+
+		};
+
+	}()
+
+};
+
+////// FULLTILT.RotationMatrix //////
+
+FULLTILT.RotationMatrix = function ( m11, m12, m13, m21, m22, m23, m31, m32, m33 ) {
+
+	var outMatrix;
+
+	this.elements = new Float32Array( 9 );
+
+	this.identity = function () {
+
+		this.set(
+			1, 0, 0,
+			0, 1, 0,
+			0, 0, 1
+		);
+
+		return this;
+
+	};
+
+	this.set = function ( m11, m12, m13, m21, m22, m23, m31, m32, m33 ) {
+
+		this.elements[ 0 ] = m11 || 1;
+		this.elements[ 1 ] = m12 || 0;
+		this.elements[ 2 ] = m13 || 0;
+		this.elements[ 3 ] = m21 || 0;
+		this.elements[ 4 ] = m22 || 1;
+		this.elements[ 5 ] = m23 || 0;
+		this.elements[ 6 ] = m31 || 0;
+		this.elements[ 7 ] = m32 || 0;
+		this.elements[ 8 ] = m33 || 1;
+
+	};
+
+	this.copy = function ( matrix ) {
+
+		this.elements[ 0 ] = matrix.elements[ 0 ];
+		this.elements[ 1 ] = matrix.elements[ 1 ];
+		this.elements[ 2 ] = matrix.elements[ 2 ];
+		this.elements[ 3 ] = matrix.elements[ 3 ];
+		this.elements[ 4 ] = matrix.elements[ 4 ];
+		this.elements[ 5 ] = matrix.elements[ 5 ];
+		this.elements[ 6 ] = matrix.elements[ 6 ];
+		this.elements[ 7 ] = matrix.elements[ 7 ];
+		this.elements[ 8 ] = matrix.elements[ 8 ];
+
+	};
+
+	this.setFromEuler = (function() {
+
+		var _x, _y, _z;
+		var cX, cY, cZ, sX, sY, sZ;
+
+		return function ( euler ) {
+
+			euler = euler || {};
+
+			_z = ( euler.alpha || 0 ) * degToRad;
+			_x = ( euler.beta || 0 ) * degToRad;
+			_y = ( euler.gamma || 0 ) * degToRad;
+
+			cX = Math.cos( _x );
+			cY = Math.cos( _y );
+			cZ = Math.cos( _z );
+			sX = Math.sin( _x );
+			sY = Math.sin( _y );
+			sZ = Math.sin( _z );
+
+			//
+			// ZXY-ordered rotation matrix construction.
+			//
+
+			this.set(
+				cZ * cY - sZ * sX * sY, // 1,1
+				- cX * sZ,              // 1,2
+				cY * sZ * sX + cZ * sY, // 1,3
+
+				cY * sZ + cZ * sX * sY, // 2,1
+				cZ * cX,                // 2,2
+				sZ * sY - cZ * cY * sX, // 2,3
+
+				- cX * sY,              // 3,1
+				sX,                     // 3,2
+				cX * cY                 // 3,3
+			);
+
+			this.normalize();
+
+			return this;
+
+		};
+
+	})();
+
+	this.setFromQuaternion = (function() {
+
+		var sqw, sqx, sqy, sqz;
+
+		return function( q ) {
+
+			sqw = q.w * q.w;
+			sqx = q.x * q.x;
+			sqy = q.y * q.y;
+			sqz = q.z * q.z;
+
+			this.set(
+				sqw + sqx - sqy - sqz,       // 1,1
+				2 * (q.x * q.y - q.w * q.z), // 1,2
+				2 * (q.x * q.z + q.w * q.y), // 1,3
+
+				2 * (q.x * q.y + q.w * q.z), // 2,1
+				sqw - sqx + sqy - sqz,       // 2,2
+				2 * (q.y * q.z - q.w * q.x), // 2,3
+
+				2 * (q.x * q.z - q.w * q.y), // 3,1
+				2 * (q.y * q.z + q.w * q.x), // 3,2
+				sqw - sqx - sqy + sqz        // 3,3
+			);
+
+			return this;
+
+		};
+
+	})();
+
+	this.multiply = function ( m ) {
+
+		outMatrix = FULLTILT.RotationMatrix.prototype.multiplyMatrices( this, m );
+		this.copy( outMatrix );
+
+		return this;
+
+	};
+
+	this.rotateX = function ( angle ) {
+
+		outMatrix = FULLTILT.RotationMatrix.prototype.rotateByAxisAngle( this, [ 1, 0, 0 ], angle );
+		this.copy( outMatrix );
+
+		return this;
+
+	};
+
+	this.rotateY = function ( angle ) {
+
+		outMatrix = FULLTILT.RotationMatrix.prototype.rotateByAxisAngle( this, [ 0, 1, 0 ], angle );
+		this.copy( outMatrix );
+
+		return this;
+
+	};
+
+	this.rotateZ = function ( angle ) {
+
+		outMatrix = FULLTILT.RotationMatrix.prototype.rotateByAxisAngle( this, [ 0, 0, 1 ], angle );
+		this.copy( outMatrix );
+
+		return this;
+
+	};
+
+	this.normalize = function () {
+
+		return FULLTILT.RotationMatrix.prototype.normalize( this );
+
+	};
+
+	// Initialize object values
+	this.set( m11, m12, m13, m21, m22, m23, m31, m32, m33 );
+
+};
+
+FULLTILT.RotationMatrix.prototype = {
+
+	constructor: FULLTILT.RotationMatrix,
+
+	multiplyMatrices: function () {
+
+		var matrix = new FULLTILT.RotationMatrix();
+
+		var aE, bE;
+
+		return function ( a, b ) {
+
+			aE = a.elements;
+			bE = b.elements;
+
+			matrix.set(
+				aE[0] * bE[0] + aE[1] * bE[3] + aE[2] * bE[6],
+				aE[0] * bE[1] + aE[1] * bE[4] + aE[2] * bE[7],
+				aE[0] * bE[2] + aE[1] * bE[5] + aE[2] * bE[8],
+
+				aE[3] * bE[0] + aE[4] * bE[3] + aE[5] * bE[6],
+				aE[3] * bE[1] + aE[4] * bE[4] + aE[5] * bE[7],
+				aE[3] * bE[2] + aE[4] * bE[5] + aE[5] * bE[8],
+
+				aE[6] * bE[0] + aE[7] * bE[3] + aE[8] * bE[6],
+				aE[6] * bE[1] + aE[7] * bE[4] + aE[8] * bE[7],
+				aE[6] * bE[2] + aE[7] * bE[5] + aE[8] * bE[8]
+			);
+
+			return matrix;
+
+		};
+
+	}(),
+
+	normalize: function( matrix ) {
+
+		var R = matrix.elements;
+
+		// Calculate matrix determinant
+		var determinant = R[0] * R[4] * R[8] - R[0] * R[5] * R[7] - R[1] * R[3] * R[8] + R[1] * R[5] * R[6] + R[2] * R[3] * R[7] - R[2] * R[4] * R[6];
+
+		// Normalize matrix values
+		R[0] /= determinant;
+		R[1] /= determinant;
+		R[2] /= determinant;
+		R[3] /= determinant;
+		R[4] /= determinant;
+		R[5] /= determinant;
+		R[6] /= determinant;
+		R[7] /= determinant;
+		R[8] /= determinant;
+
+		matrix.elements = R;
+
+		return matrix;
+
+	},
+
+	rotateByAxisAngle: function () {
+
+		var outputMatrix = new FULLTILT.RotationMatrix();
+		var transformMatrix = new FULLTILT.RotationMatrix();
+
+		var sA, cA;
+		var validAxis = false;
+
+		return function ( targetRotationMatrix, axis, angle ) {
+
+			transformMatrix.identity(); // reset transform matrix
+
+			validAxis = false;
+
+			sA = Math.sin( angle );
+			cA = Math.cos( angle );
+
+			if ( axis[ 0 ] === 1 && axis[ 1 ] === 0 && axis[ 2 ] === 0 ) { // x
+
+				validAxis = true;
+
+				transformMatrix.elements[4] = cA;
+				transformMatrix.elements[5] = -sA;
+				transformMatrix.elements[7] = sA;
+				transformMatrix.elements[8] = cA;
+
+	 		} else if ( axis[ 1 ] === 1 && axis[ 0 ] === 0 && axis[ 2 ] === 0 ) { // y
+
+				validAxis = true;
+
+				transformMatrix.elements[0] = cA;
+				transformMatrix.elements[2] = sA;
+				transformMatrix.elements[6] = -sA;
+				transformMatrix.elements[8] = cA;
+
+	 		} else if ( axis[ 2 ] === 1 && axis[ 0 ] === 0 && axis[ 1 ] === 0 ) { // z
+
+				validAxis = true;
+
+				transformMatrix.elements[0] = cA;
+				transformMatrix.elements[1] = -sA;
+				transformMatrix.elements[3] = sA;
+				transformMatrix.elements[4] = cA;
+
+	 		}
+
+			if ( validAxis ) {
+
+				outputMatrix = FULLTILT.RotationMatrix.prototype.multiplyMatrices( targetRotationMatrix, transformMatrix );
+
+				outputMatrix = FULLTILT.RotationMatrix.prototype.normalize( outputMatrix );
+
+			} else {
+
+				outputMatrix = targetRotationMatrix;
+
+			}
+
+			return outputMatrix;
+
+		};
+
+	}()
+
+};
+
+////// FULLTILT.Euler //////
+
+FULLTILT.Euler = function ( alpha, beta, gamma ) {
+
+	this.set = function ( alpha, beta, gamma ) {
+
+		this.alpha = alpha || 0;
+		this.beta  = beta  || 0;
+		this.gamma = gamma || 0;
+
+	};
+
+	this.copy = function ( inEuler ) {
+
+		this.alpha = inEuler.alpha;
+		this.beta  = inEuler.beta;
+		this.gamma = inEuler.gamma;
+
+	};
+
+	this.setFromRotationMatrix = (function () {
+
+		var R, _alpha, _beta, _gamma;
+
+		return function ( matrix ) {
+
+			R = matrix.elements;
+
+			if (R[8] > 0) { // cos(beta) > 0
+
+				_alpha = Math.atan2(-R[1], R[4]);
+				_beta  = Math.asin(R[7]); // beta (-pi/2, pi/2)
+				_gamma = Math.atan2(-R[6], R[8]); // gamma (-pi/2, pi/2)
+
+			} else if (R[8] < 0) {  // cos(beta) < 0
+
+				_alpha = Math.atan2(R[1], -R[4]);
+				_beta  = -Math.asin(R[7]);
+				_beta  += (_beta >= 0) ? - M_PI : M_PI; // beta [-pi,-pi/2) U (pi/2,pi)
+				_gamma = Math.atan2(R[6], -R[8]); // gamma (-pi/2, pi/2)
+
+			} else { // R[8] == 0
+
+				if (R[6] > 0) {  // cos(gamma) == 0, cos(beta) > 0
+
+					_alpha = Math.atan2(-R[1], R[4]);
+					_beta  = Math.asin(R[7]); // beta [-pi/2, pi/2]
+					_gamma = - M_PI_2; // gamma = -pi/2
+
+				} else if (R[6] < 0) { // cos(gamma) == 0, cos(beta) < 0
+
+					_alpha = Math.atan2(R[1], -R[4]);
+					_beta  = -Math.asin(R[7]);
+					_beta  += (_beta >= 0) ? - M_PI : M_PI; // beta [-pi,-pi/2) U (pi/2,pi)
+					_gamma = - M_PI_2; // gamma = -pi/2
+
+				} else { // R[6] == 0, cos(beta) == 0
+
+					// gimbal lock discontinuity
+					_alpha = Math.atan2(R[3], R[0]);
+					_beta  = (R[7] > 0) ? M_PI_2 : - M_PI_2; // beta = +-pi/2
+					_gamma = 0; // gamma = 0
+
+				}
+
+			}
+
+			// alpha is in [-pi, pi], make sure it is in [0, 2*pi).
+			if (_alpha < 0) {
+				_alpha += M_2_PI; // alpha [0, 2*pi)
+			}
+
+			// Convert to degrees
+			_alpha *= radToDeg;
+			_beta  *= radToDeg;
+			_gamma *= radToDeg;
+
+			// apply derived euler angles to current object
+			this.set( _alpha, _beta, _gamma );
+
+		};
+
+	})();
+
+	this.setFromQuaternion = (function () {
+
+		var _alpha, _beta, _gamma;
+
+		return function ( q ) {
+
+			var sqw = q.w * q.w;
+			var sqx = q.x * q.x;
+			var sqy = q.y * q.y;
+			var sqz = q.z * q.z;
+
+			var unitLength = sqw + sqx + sqy + sqz; // Normalised == 1, otherwise correction divisor.
+			var wxyz = q.w * q.x + q.y * q.z;
+			var epsilon = 1e-6; // rounding factor
+
+			if (wxyz > (0.5 - epsilon) * unitLength) {
+
+				_alpha = 2 * Math.atan2(q.y, q.w);
+				_beta = M_PI_2;
+				_gamma = 0;
+
+			} else if (wxyz < (-0.5 + epsilon) * unitLength) {
+
+				_alpha = -2 * Math.atan2(q.y, q.w);
+				_beta = -M_PI_2;
+				_gamma = 0;
+
+			} else {
+
+				var aX = sqw - sqx + sqy - sqz;
+				var aY = 2 * (q.w * q.z - q.x * q.y);
+
+				var gX = sqw - sqx - sqy + sqz;
+				var gY = 2 * (q.w * q.y - q.x * q.z);
+
+				if (gX > 0) {
+
+					_alpha = Math.atan2(aY, aX);
+					_beta  = Math.asin(2 * wxyz / unitLength);
+					_gamma = Math.atan2(gY, gX);
+
+				} else {
+
+					_alpha = Math.atan2(-aY, -aX);
+					_beta  = -Math.asin(2 * wxyz / unitLength);
+					_beta  += _beta < 0 ? M_PI : - M_PI;
+					_gamma = Math.atan2(-gY, -gX);
+
+				}
+
+			}
+
+			// alpha is in [-pi, pi], make sure it is in [0, 2*pi).
+			if (_alpha < 0) {
+				_alpha += M_2_PI; // alpha [0, 2*pi)
+			}
+
+			// Convert to degrees
+			_alpha *= radToDeg;
+			_beta  *= radToDeg;
+			_gamma *= radToDeg;
+
+			// apply derived euler angles to current object
+			this.set( _alpha, _beta, _gamma );
+
+		};
+
+	})();
+
+	this.rotateX = function ( angle ) {
+
+		FULLTILT.Euler.prototype.rotateByAxisAngle( this, [ 1, 0, 0 ], angle );
+
+		return this;
+
+	};
+
+	this.rotateY = function ( angle ) {
+
+		FULLTILT.Euler.prototype.rotateByAxisAngle( this, [ 0, 1, 0 ], angle );
+
+		return this;
+
+	};
+
+	this.rotateZ = function ( angle ) {
+
+		FULLTILT.Euler.prototype.rotateByAxisAngle( this, [ 0, 0, 1 ], angle );
+
+		return this;
+
+	};
+
+	// Initialize object values
+	this.set( alpha, beta, gamma );
+
+};
+
+FULLTILT.Euler.prototype = {
+
+	constructor: FULLTILT.Euler,
+
+	rotateByAxisAngle: function () {
+
+		var _matrix = new FULLTILT.RotationMatrix();
+		var outEuler;
+
+		return function ( targetEuler, axis, angle ) {
+
+			_matrix.setFromEuler( targetEuler );
+
+			_matrix = FULLTILT.RotationMatrix.prototype.rotateByAxisAngle( _matrix, axis, angle );
+
+			targetEuler.setFromRotationMatrix( _matrix );
+
+			return targetEuler;
+
+		};
+
+	}()
+
+};
+
+///// FULLTILT.DeviceOrientation //////
+
+FULLTILT.DeviceOrientation = function (options) {
+
+	this.options = options || {}; // by default use UA deviceorientation 'type' ("game" on iOS, "world" on Android)
+
+	var tries = 0;
+	var maxTries = 200;
+	var successCount = 0;
+	var successThreshold = 10;
+
+	this.alphaOffsetScreen = 0;
+	this.alphaOffsetDevice = undefined;
+
+	// Create a game-based deviceorientation object (initial alpha === 0 degrees)
+	if (this.options.type === "game") {
+
+		var setGameAlphaOffset = function(evt) {
+
+			if (evt.alpha !== null) { // do regardless of whether 'evt.absolute' is also true
+				this.alphaOffsetDevice = new FULLTILT.Euler(evt.alpha, 0, 0);
+				this.alphaOffsetDevice.rotateZ( -screenOrientationAngle );
+
+				// Discard first {successThreshold} responses while a better compass lock is found by UA
+				if(++successCount >= successThreshold) {
+					window.removeEventListener( 'deviceorientation', setGameAlphaOffset, false );
+					return;
+				}
+			}
+
+			if(++tries >= maxTries) {
+				window.removeEventListener( 'deviceorientation', setGameAlphaOffset, false );
+			}
+
+		}.bind(this);
+
+		window.addEventListener( 'deviceorientation', setGameAlphaOffset, false );
+
+	// Create a compass-based deviceorientation object (initial alpha === compass degrees)
+	} else if (this.options.type === "world") {
+
+		var setCompassAlphaOffset = function(evt) {
+
+			if (evt.absolute !== true && evt.webkitCompassAccuracy !== undefined && evt.webkitCompassAccuracy !== null && +evt.webkitCompassAccuracy >= 0 && +evt.webkitCompassAccuracy < 50) {
+				this.alphaOffsetDevice = new FULLTILT.Euler(evt.webkitCompassHeading, 0, 0);
+				this.alphaOffsetDevice.rotateZ( screenOrientationAngle );
+				this.alphaOffsetScreen = screenOrientationAngle;
+
+				// Discard first {successThreshold} responses while a better compass lock is found by UA
+				if(++successCount >= successThreshold) {
+					window.removeEventListener( 'deviceorientation', setCompassAlphaOffset, false );
+					return;
+				}
+			}
+
+			if(++tries >= maxTries) {
+				window.removeEventListener( 'deviceorientation', setCompassAlphaOffset, false );
+			}
+
+		}.bind(this);
+
+		window.addEventListener( 'deviceorientation', setCompassAlphaOffset, false );
+
+	} // else... use whatever orientation system the UA provides ("game" on iOS, "world" on Android)
+
+};
+
+FULLTILT.DeviceOrientation.prototype = {
+
+	constructor: FULLTILT.DeviceOrientation,
+
+	start: function ( callback ) {
+
+		if ( callback && Object.prototype.toString.call( callback ) == '[object Function]' ) {
+
+			sensors.orientation.callbacks.push( callback );
+
+		}
+
+		if( !screenActive ) {
+
+			if ( hasScreenOrientationAPI ) {
+
+			window.screen.orientation.addEventListener( 'change', handleScreenOrientationChange, false );
+
+			} else {
+
+				window.addEventListener( 'orientationchange', handleScreenOrientationChange, false );
+
+			}
+
+		}
+
+		if ( !sensors.orientation.active ) {
+
+			window.addEventListener( 'deviceorientation', handleDeviceOrientationChange, false );
+
+			sensors.orientation.active = true;
+
+		}
+
+	},
+
+	stop: function () {
+
+		if ( sensors.orientation.active ) {
+
+			window.removeEventListener( 'deviceorientation', handleDeviceOrientationChange, false );
+
+			sensors.orientation.active = false;
+
+		}
+
+	},
+
+	listen: function( callback ) {
+
+		this.start( callback );
+
+	},
+
+	getFixedFrameQuaternion: (function () {
+
+		var euler = new FULLTILT.Euler();
+		var matrix = new FULLTILT.RotationMatrix();
+		var quaternion = new FULLTILT.Quaternion();
+
+		return function() {
+
+			var orientationData = sensors.orientation.data || { alpha: 0, beta: 0, gamma: 0 };
+
+			var adjustedAlpha = orientationData.alpha;
+
+			if (this.alphaOffsetDevice) {
+				matrix.setFromEuler( this.alphaOffsetDevice );
+				matrix.rotateZ( - this.alphaOffsetScreen );
+				euler.setFromRotationMatrix( matrix );
+
+				if (euler.alpha < 0) {
+					euler.alpha += 360;
+				}
+
+				euler.alpha %= 360;
+
+				adjustedAlpha -= euler.alpha;
+			}
+
+			euler.set(
+				adjustedAlpha,
+				orientationData.beta,
+				orientationData.gamma
+			);
+
+			quaternion.setFromEuler( euler );
+
+			return quaternion;
+
+		};
+
+	})(),
+
+	getScreenAdjustedQuaternion: (function () {
+
+		var quaternion;
+
+		return function() {
+
+			quaternion = this.getFixedFrameQuaternion();
+
+			// Automatically apply screen orientation transform
+			quaternion.rotateZ( - screenOrientationAngle );
+
+			return quaternion;
+
+		};
+
+	})(),
+
+	getFixedFrameMatrix: (function () {
+
+		var euler = new FULLTILT.Euler();
+		var matrix = new FULLTILT.RotationMatrix();
+
+		return function () {
+
+			var orientationData = sensors.orientation.data || { alpha: 0, beta: 0, gamma: 0 };
+
+			var adjustedAlpha = orientationData.alpha;
+
+			if (this.alphaOffsetDevice) {
+				matrix.setFromEuler( this.alphaOffsetDevice );
+				matrix.rotateZ( - this.alphaOffsetScreen );
+				euler.setFromRotationMatrix( matrix );
+
+				if (euler.alpha < 0) {
+					euler.alpha += 360;
+				}
+
+				euler.alpha %= 360;
+
+				adjustedAlpha -= euler.alpha;
+			}
+
+			euler.set(
+				adjustedAlpha,
+				orientationData.beta,
+				orientationData.gamma
+			);
+
+			matrix.setFromEuler( euler );
+
+			return matrix;
+
+		};
+
+	})(),
+
+	getScreenAdjustedMatrix: (function () {
+
+		var matrix;
+
+		return function () {
+
+			matrix = this.getFixedFrameMatrix();
+
+			// Automatically apply screen orientation transform
+			matrix.rotateZ( - screenOrientationAngle );
+
+			return matrix;
+
+		};
+
+	})(),
+
+	getFixedFrameEuler: (function () {
+
+		var euler = new FULLTILT.Euler();
+		var matrix;
+
+		return function () {
+
+			matrix = this.getFixedFrameMatrix();
+
+			euler.setFromRotationMatrix( matrix );
+
+			return euler;
+
+		};
+
+	})(),
+
+	getScreenAdjustedEuler: (function () {
+
+		var euler = new FULLTILT.Euler();
+		var matrix;
+
+		return function () {
+
+			matrix = this.getScreenAdjustedMatrix();
+
+			euler.setFromRotationMatrix( matrix );
+
+			return euler;
+
+		};
+
+	})(),
+
+	isAbsolute: function () {
+
+		if ( sensors.orientation.data && sensors.orientation.data.absolute === true ) {
+			return true;
+		}
+
+		return false;
+
+	},
+
+	getLastRawEventData: function () {
+
+		return sensors.orientation.data || {};
+
+	},
+
+	_alphaAvailable: false,
+	_betaAvailable: false,
+	_gammaAvailable: false,
+
+	isAvailable: function(_valueType){
+
+		switch(_valueType){
+			case this.ALPHA:
+				return this._alphaAvailable;
+
+			case this.BETA:
+				return this._betaAvailable;
+
+			case this.GAMMA:
+				return this._gammaAvailable;
+		}
+
+	},
+
+	ALPHA: 'alpha',
+	BETA: 'beta',
+	GAMMA: 'gamma'
+
+};
+
+
+///// FULLTILT.DeviceMotion //////
+
+FULLTILT.DeviceMotion = function (options) {
+
+	this.options = options || {}; // placeholder object since no options are currently supported
+
+};
+
+FULLTILT.DeviceMotion.prototype = {
+
+	constructor: FULLTILT.DeviceMotion,
+
+	start: function ( callback ) {
+
+		if ( callback && Object.prototype.toString.call( callback ) == '[object Function]' ) {
+
+			sensors.motion.callbacks.push( callback );
+
+		}
+
+		if( !screenActive ) {
+
+			if ( hasScreenOrientationAPI ) {
+
+				window.screen.orientation.addEventListener( 'change', handleScreenOrientationChange, false );
+
+			} else {
+
+				window.addEventListener( 'orientationchange', handleScreenOrientationChange, false );
+
+			}
+
+		}
+
+		if ( !sensors.motion.active ) {
+
+			window.addEventListener( 'devicemotion', handleDeviceMotionChange, false );
+
+			sensors.motion.active = true;
+
+		}
+
+	},
+
+	stop: function () {
+
+		if ( sensors.motion.active ) {
+
+			window.removeEventListener( 'devicemotion', handleDeviceMotionChange, false );
+
+			sensors.motion.active = false;
+
+		}
+
+	},
+
+	listen: function( callback ) {
+
+		this.start( callback );
+
+	},
+
+	getScreenAdjustedAcceleration: function () {
+
+		var accData = sensors.motion.data && sensors.motion.data.acceleration ? sensors.motion.data.acceleration : { x: 0, y: 0, z: 0 };
+		var screenAccData = {};
+
+		switch ( screenOrientationAngle ) {
+			case SCREEN_ROTATION_90:
+				screenAccData.x = - accData.y;
+				screenAccData.y =   accData.x;
+				break;
+			case SCREEN_ROTATION_180:
+				screenAccData.x = - accData.x;
+				screenAccData.y = - accData.y;
+				break;
+			case SCREEN_ROTATION_270:
+			case SCREEN_ROTATION_MINUS_90:
+				screenAccData.x =   accData.y;
+				screenAccData.y = - accData.x;
+				break;
+			default: // SCREEN_ROTATION_0
+				screenAccData.x =   accData.x;
+				screenAccData.y =   accData.y;
+				break;
+		}
+
+		screenAccData.z = accData.z;
+
+		return screenAccData;
+
+	},
+
+	getScreenAdjustedAccelerationIncludingGravity: function () {
+
+		var accGData = sensors.motion.data && sensors.motion.data.accelerationIncludingGravity ? sensors.motion.data.accelerationIncludingGravity : { x: 0, y: 0, z: 0 };
+		var screenAccGData = {};
+
+		switch ( screenOrientationAngle ) {
+			case SCREEN_ROTATION_90:
+				screenAccGData.x = - accGData.y;
+				screenAccGData.y =   accGData.x;
+				break;
+			case SCREEN_ROTATION_180:
+				screenAccGData.x = - accGData.x;
+				screenAccGData.y = - accGData.y;
+				break;
+			case SCREEN_ROTATION_270:
+			case SCREEN_ROTATION_MINUS_90:
+				screenAccGData.x =   accGData.y;
+				screenAccGData.y = - accGData.x;
+				break;
+			default: // SCREEN_ROTATION_0
+				screenAccGData.x =   accGData.x;
+				screenAccGData.y =   accGData.y;
+				break;
+		}
+
+		screenAccGData.z = accGData.z;
+
+		return screenAccGData;
+
+	},
+
+	getScreenAdjustedRotationRate: function () {
+
+		var rotRateData = sensors.motion.data && sensors.motion.data.rotationRate ? sensors.motion.data.rotationRate : { alpha: 0, beta: 0, gamma: 0 };
+		var screenRotRateData = {};
+
+		switch ( screenOrientationAngle ) {
+			case SCREEN_ROTATION_90:
+				screenRotRateData.beta  = - rotRateData.gamma;
+				screenRotRateData.gamma =   rotRateData.beta;
+				break;
+			case SCREEN_ROTATION_180:
+				screenRotRateData.beta  = - rotRateData.beta;
+				screenRotRateData.gamma = - rotRateData.gamma;
+				break;
+			case SCREEN_ROTATION_270:
+			case SCREEN_ROTATION_MINUS_90:
+				screenRotRateData.beta  =   rotRateData.gamma;
+				screenRotRateData.gamma = - rotRateData.beta;
+				break;
+			default: // SCREEN_ROTATION_0
+				screenRotRateData.beta  =   rotRateData.beta;
+				screenRotRateData.gamma =   rotRateData.gamma;
+				break;
+		}
+
+		screenRotRateData.alpha = rotRateData.alpha;
+
+		return screenRotRateData;
+
+	},
+
+	getLastRawEventData: function () {
+
+		return sensors.motion.data || {};
+
+	},
+
+	_accelerationXAvailable: false,
+	_accelerationYAvailable: false,
+	_accelerationZAvailable: false,
+
+	_accelerationIncludingGravityXAvailable: false,
+	_accelerationIncludingGravityYAvailable: false,
+	_accelerationIncludingGravityZAvailable: false,
+
+	_rotationRateAlphaAvailable: false,
+	_rotationRateBetaAvailable: false,
+	_rotationRateGammaAvailable: false,
+
+	isAvailable: function(_valueType){
+
+		switch(_valueType){
+			case this.ACCELERATION_X:
+				return this._accelerationXAvailable;
+
+			case this.ACCELERATION_Y:
+				return this._accelerationYAvailable;
+
+			case this.ACCELERATION_Z:
+				return this._accelerationZAvailable;
+
+			case this.ACCELERATION_INCLUDING_GRAVITY_X:
+				return this._accelerationIncludingGravityXAvailable;
+
+			case this.ACCELERATION_INCLUDING_GRAVITY_Y:
+				return this._accelerationIncludingGravityYAvailable;
+
+			case this.ACCELERATION_INCLUDING_GRAVITY_Z:
+				return this._accelerationIncludingGravityZAvailable;
+
+			case this.ROTATION_RATE_ALPHA:
+				return this._rotationRateAlphaAvailable;
+
+			case this.ROTATION_RATE_BETA:
+				return this._rotationRateBetaAvailable;
+
+			case this.ROTATION_RATE_GAMMA:
+				return this._rotationRateGammaAvailable;
+		}
+	},
+
+	ACCELERATION_X: 'accelerationX',
+	ACCELERATION_Y: 'accelerationY',
+	ACCELERATION_Z: 'accelerationZ',
+
+	ACCELERATION_INCLUDING_GRAVITY_X: 'accelerationIncludingGravityX',
+	ACCELERATION_INCLUDING_GRAVITY_Y: 'accelerationIncludingGravityY',
+	ACCELERATION_INCLUDING_GRAVITY_Z: 'accelerationIncludingGravityZ',
+
+	ROTATION_RATE_ALPHA: 'rotationRateAlpha',
+	ROTATION_RATE_BETA: 'rotationRateBeta',
+	ROTATION_RATE_GAMMA: 'rotationRateGamma'
+
+};
+
+////// Attach FULLTILT to root DOM element //////
+
+window.FULLTILT = FULLTILT;
+
+})( window );
+;
 /*!
- * jQuery JavaScript Library v3.6.0
+ * jQuery JavaScript Library v3.6.1
  * https://jquery.com/
  *
  * Includes Sizzle.js
@@ -9,7 +1483,7 @@
  * Released under the MIT license
  * https://jquery.org/license
  *
- * Date: 2021-03-02T17:08Z
+ * Date: 2022-08-26T17:52Z
  */
 ( function( global, factory ) {
 
@@ -23,7 +1497,7 @@
 		// (such as Node.js), expose a factory as module.exports.
 		// This accentuates the need for the creation of a real `window`.
 		// e.g. var jQuery = require("jquery")(window);
-		// See ticket #14549 for more info.
+		// See ticket trac-14549 for more info.
 		module.exports = global.document ?
 			factory( global, true ) :
 			function( w ) {
@@ -151,7 +1625,7 @@ function toType( obj ) {
 
 
 var
-	version = "3.6.0",
+	version = "3.6.1",
 
 	// Define a local copy of jQuery
 	jQuery = function( selector, context ) {
@@ -3129,8 +4603,8 @@ jQuery.fn.extend( {
 var rootjQuery,
 
 	// A simple way to check for HTML strings
-	// Prioritize #id over <tag> to avoid XSS via location.hash (#9521)
-	// Strict HTML recognition (#11290: must start with <)
+	// Prioritize #id over <tag> to avoid XSS via location.hash (trac-9521)
+	// Strict HTML recognition (trac-11290: must start with <)
 	// Shortcut simple #id case for speed
 	rquickExpr = /^(?:\s*(<[\w\W]+>)[^>]*|#([\w-]+))$/,
 
@@ -4087,7 +5561,7 @@ jQuery.extend( {
 	isReady: false,
 
 	// A counter to track how many items to wait for before
-	// the ready event fires. See #6781
+	// the ready event fires. See trac-6781
 	readyWait: 1,
 
 	// Handle when the DOM is ready
@@ -4215,7 +5689,7 @@ function fcamelCase( _all, letter ) {
 
 // Convert dashed to camelCase; used by the css and data modules
 // Support: IE <=9 - 11, Edge 12 - 15
-// Microsoft forgot to hump their vendor prefix (#9572)
+// Microsoft forgot to hump their vendor prefix (trac-9572)
 function camelCase( string ) {
 	return string.replace( rmsPrefix, "ms-" ).replace( rdashAlpha, fcamelCase );
 }
@@ -4251,7 +5725,7 @@ Data.prototype = {
 			value = {};
 
 			// We can accept data for non-element nodes in modern browsers,
-			// but we should not, see #8335.
+			// but we should not, see trac-8335.
 			// Always return an empty object.
 			if ( acceptData( owner ) ) {
 
@@ -4490,7 +5964,7 @@ jQuery.fn.extend( {
 					while ( i-- ) {
 
 						// Support: IE 11 only
-						// The attrs elements can be null (#14894)
+						// The attrs elements can be null (trac-14894)
 						if ( attrs[ i ] ) {
 							name = attrs[ i ].name;
 							if ( name.indexOf( "data-" ) === 0 ) {
@@ -4913,9 +6387,9 @@ var rscriptType = ( /^$|^module$|\/(?:java|ecma)script/i );
 		input = document.createElement( "input" );
 
 	// Support: Android 4.0 - 4.3 only
-	// Check state lost if the name is set (#11217)
+	// Check state lost if the name is set (trac-11217)
 	// Support: Windows Web Apps (WWA)
-	// `name` and `type` must use .setAttribute for WWA (#14901)
+	// `name` and `type` must use .setAttribute for WWA (trac-14901)
 	input.setAttribute( "type", "radio" );
 	input.setAttribute( "checked", "checked" );
 	input.setAttribute( "name", "t" );
@@ -4939,7 +6413,7 @@ var rscriptType = ( /^$|^module$|\/(?:java|ecma)script/i );
 } )();
 
 
-// We have to close these tags to support XHTML (#13200)
+// We have to close these tags to support XHTML (trac-13200)
 var wrapMap = {
 
 	// XHTML parsers do not magically insert elements in the
@@ -4965,7 +6439,7 @@ if ( !support.option ) {
 function getAll( context, tag ) {
 
 	// Support: IE <=9 - 11 only
-	// Use typeof to avoid zero-argument method invocation on host objects (#15151)
+	// Use typeof to avoid zero-argument method invocation on host objects (trac-15151)
 	var ret;
 
 	if ( typeof context.getElementsByTagName !== "undefined" ) {
@@ -5048,7 +6522,7 @@ function buildFragment( elems, context, scripts, selection, ignored ) {
 				// Remember the top-level container
 				tmp = fragment.firstChild;
 
-				// Ensure the created nodes are orphaned (#12392)
+				// Ensure the created nodes are orphaned (trac-12392)
 				tmp.textContent = "";
 			}
 		}
@@ -5469,15 +6943,15 @@ jQuery.event = {
 
 			for ( ; cur !== this; cur = cur.parentNode || this ) {
 
-				// Don't check non-elements (#13208)
-				// Don't process clicks on disabled elements (#6911, #8165, #11382, #11764)
+				// Don't check non-elements (trac-13208)
+				// Don't process clicks on disabled elements (trac-6911, trac-8165, trac-11382, trac-11764)
 				if ( cur.nodeType === 1 && !( event.type === "click" && cur.disabled === true ) ) {
 					matchedHandlers = [];
 					matchedSelectors = {};
 					for ( i = 0; i < delegateCount; i++ ) {
 						handleObj = handlers[ i ];
 
-						// Don't conflict with Object.prototype properties (#13203)
+						// Don't conflict with Object.prototype properties (trac-13203)
 						sel = handleObj.selector + " ";
 
 						if ( matchedSelectors[ sel ] === undefined ) {
@@ -5731,7 +7205,7 @@ jQuery.Event = function( src, props ) {
 
 		// Create target properties
 		// Support: Safari <=6 - 7 only
-		// Target should not be a text node (#504, #13143)
+		// Target should not be a text node (trac-504, trac-13143)
 		this.target = ( src.target && src.target.nodeType === 3 ) ?
 			src.target.parentNode :
 			src.target;
@@ -5854,10 +7328,10 @@ jQuery.each( { focus: "focusin", blur: "focusout" }, function( type, delegateTyp
 			return true;
 		},
 
-		// Suppress native focus or blur as it's already being fired
-		// in leverageNative.
-		_default: function() {
-			return true;
+		// Suppress native focus or blur if we're currently inside
+		// a leveraged native-event stack
+		_default: function( event ) {
+			return dataPriv.get( event.target, type );
 		},
 
 		delegateType: delegateType
@@ -5956,7 +7430,8 @@ var
 
 	// checked="checked" or checked
 	rchecked = /checked\s*(?:[^=]|=\s*.checked.)/i,
-	rcleanScript = /^\s*<!(?:\[CDATA\[|--)|(?:\]\]|--)>\s*$/g;
+
+	rcleanScript = /^\s*<!\[CDATA\[|\]\]>\s*$/g;
 
 // Prefer a tbody over its parent table for containing new rows
 function manipulationTarget( elem, content ) {
@@ -6070,7 +7545,7 @@ function domManip( collection, args, callback, ignored ) {
 
 			// Use the original fragment for the last item
 			// instead of the first because it can end up
-			// being emptied incorrectly in certain situations (#8070).
+			// being emptied incorrectly in certain situations (trac-8070).
 			for ( ; i < l; i++ ) {
 				node = fragment;
 
@@ -6111,6 +7586,12 @@ function domManip( collection, args, callback, ignored ) {
 								}, doc );
 							}
 						} else {
+
+							// Unwrap a CDATA section containing script contents. This shouldn't be
+							// needed as in XML documents they're already not visible when
+							// inspecting element contents and in HTML documents they have no
+							// meaning but we're preserving that logic for backwards compatibility.
+							// This will be removed completely in 4.0. See gh-4904.
 							DOMEval( node.textContent.replace( rcleanScript, "" ), node, doc );
 						}
 					}
@@ -6393,9 +7874,12 @@ jQuery.each( {
 } );
 var rnumnonpx = new RegExp( "^(" + pnum + ")(?!px)[a-z%]+$", "i" );
 
+var rcustomProp = /^--/;
+
+
 var getStyles = function( elem ) {
 
-		// Support: IE <=11 only, Firefox <=30 (#15098, #14150)
+		// Support: IE <=11 only, Firefox <=30 (trac-15098, trac-14150)
 		// IE throws on elements created in popups
 		// FF meanwhile throws on frame elements through "defaultView.getComputedStyle"
 		var view = elem.ownerDocument.defaultView;
@@ -6429,6 +7913,15 @@ var swap = function( elem, options, callback ) {
 
 
 var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
+
+var whitespace = "[\\x20\\t\\r\\n\\f]";
+
+
+var rtrimCSS = new RegExp(
+	"^" + whitespace + "+|((?:^|[^\\\\])(?:\\\\.)*)" + whitespace + "+$",
+	"g"
+);
+
 
 
 
@@ -6495,7 +7988,7 @@ var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 	}
 
 	// Support: IE <=9 - 11 only
-	// Style of cloned element affects source element cloned (#8908)
+	// Style of cloned element affects source element cloned (trac-8908)
 	div.style.backgroundClip = "content-box";
 	div.cloneNode( true ).style.backgroundClip = "";
 	support.clearCloneStyle = div.style.backgroundClip === "content-box";
@@ -6575,6 +8068,7 @@ var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 
 function curCSS( elem, name, computed ) {
 	var width, minWidth, maxWidth, ret,
+		isCustomProp = rcustomProp.test( name ),
 
 		// Support: Firefox 51+
 		// Retrieving style before computed somehow
@@ -6585,10 +8079,21 @@ function curCSS( elem, name, computed ) {
 	computed = computed || getStyles( elem );
 
 	// getPropertyValue is needed for:
-	//   .css('filter') (IE 9 only, #12537)
-	//   .css('--customProperty) (#3144)
+	//   .css('filter') (IE 9 only, trac-12537)
+	//   .css('--customProperty) (gh-3144)
 	if ( computed ) {
 		ret = computed.getPropertyValue( name ) || computed[ name ];
+
+		// trim whitespace for custom property (issue gh-4926)
+		if ( isCustomProp ) {
+
+			// rtrim treats U+000D CARRIAGE RETURN and U+000C FORM FEED
+			// as whitespace while CSS does not, but this is not a problem
+			// because CSS preprocessing replaces them with U+000A LINE FEED
+			// (which *is* CSS whitespace)
+			// https://www.w3.org/TR/css-syntax-3/#input-preprocessing
+			ret = ret.replace( rtrimCSS, "$1" );
+		}
 
 		if ( ret === "" && !isAttached( elem ) ) {
 			ret = jQuery.style( elem, name );
@@ -6685,7 +8190,6 @@ var
 	// except "table", "table-cell", or "table-caption"
 	// See here for display values: https://developer.mozilla.org/en-US/docs/CSS/display
 	rdisplayswap = /^(none|table(?!-c[ea]).+)/,
-	rcustomProp = /^--/,
 	cssShow = { position: "absolute", visibility: "hidden", display: "block" },
 	cssNormalTransform = {
 		letterSpacing: "0",
@@ -6921,15 +8425,15 @@ jQuery.extend( {
 		if ( value !== undefined ) {
 			type = typeof value;
 
-			// Convert "+=" or "-=" to relative numbers (#7345)
+			// Convert "+=" or "-=" to relative numbers (trac-7345)
 			if ( type === "string" && ( ret = rcssNum.exec( value ) ) && ret[ 1 ] ) {
 				value = adjustCSS( elem, name, ret );
 
-				// Fixes bug #9237
+				// Fixes bug trac-9237
 				type = "number";
 			}
 
-			// Make sure that null and NaN values aren't set (#7116)
+			// Make sure that null and NaN values aren't set (trac-7116)
 			if ( value == null || value !== value ) {
 				return;
 			}
@@ -7553,7 +9057,7 @@ function Animation( elem, properties, options ) {
 				remaining = Math.max( 0, animation.startTime + animation.duration - currentTime ),
 
 				// Support: Android 2.3 only
-				// Archaic crash bug won't allow us to use `1 - ( 0.5 || 0 )` (#12497)
+				// Archaic crash bug won't allow us to use `1 - ( 0.5 || 0 )` (trac-12497)
 				temp = remaining / animation.duration || 0,
 				percent = 1 - temp,
 				index = 0,
@@ -7943,7 +9447,6 @@ jQuery.fx.speeds = {
 
 
 // Based off of the plugin by Clint Helfers, with permission.
-// https://web.archive.org/web/20100324014747/http://blindsignals.com/index.php/2009/07/jquery-delay/
 jQuery.fn.delay = function( time, type ) {
 	time = jQuery.fx ? jQuery.fx.speeds[ time ] || time : time;
 	type = type || "fx";
@@ -8168,8 +9671,7 @@ jQuery.extend( {
 				// Support: IE <=9 - 11 only
 				// elem.tabIndex doesn't always return the
 				// correct value when it hasn't been explicitly set
-				// https://web.archive.org/web/20141116233347/http://fluidproject.org/blog/2008/01/09/getting-setting-and-removing-tabindex-values-with-javascript/
-				// Use proper attribute retrieval(#12072)
+				// Use proper attribute retrieval (trac-12072)
 				var tabindex = jQuery.find.attr( elem, "tabindex" );
 
 				if ( tabindex ) {
@@ -8273,8 +9775,7 @@ function classesToArray( value ) {
 
 jQuery.fn.extend( {
 	addClass: function( value ) {
-		var classes, elem, cur, curValue, clazz, j, finalValue,
-			i = 0;
+		var classNames, cur, curValue, className, i, finalValue;
 
 		if ( isFunction( value ) ) {
 			return this.each( function( j ) {
@@ -8282,36 +9783,35 @@ jQuery.fn.extend( {
 			} );
 		}
 
-		classes = classesToArray( value );
+		classNames = classesToArray( value );
 
-		if ( classes.length ) {
-			while ( ( elem = this[ i++ ] ) ) {
-				curValue = getClass( elem );
-				cur = elem.nodeType === 1 && ( " " + stripAndCollapse( curValue ) + " " );
+		if ( classNames.length ) {
+			return this.each( function() {
+				curValue = getClass( this );
+				cur = this.nodeType === 1 && ( " " + stripAndCollapse( curValue ) + " " );
 
 				if ( cur ) {
-					j = 0;
-					while ( ( clazz = classes[ j++ ] ) ) {
-						if ( cur.indexOf( " " + clazz + " " ) < 0 ) {
-							cur += clazz + " ";
+					for ( i = 0; i < classNames.length; i++ ) {
+						className = classNames[ i ];
+						if ( cur.indexOf( " " + className + " " ) < 0 ) {
+							cur += className + " ";
 						}
 					}
 
 					// Only assign if different to avoid unneeded rendering.
 					finalValue = stripAndCollapse( cur );
 					if ( curValue !== finalValue ) {
-						elem.setAttribute( "class", finalValue );
+						this.setAttribute( "class", finalValue );
 					}
 				}
-			}
+			} );
 		}
 
 		return this;
 	},
 
 	removeClass: function( value ) {
-		var classes, elem, cur, curValue, clazz, j, finalValue,
-			i = 0;
+		var classNames, cur, curValue, className, i, finalValue;
 
 		if ( isFunction( value ) ) {
 			return this.each( function( j ) {
@@ -8323,44 +9823,41 @@ jQuery.fn.extend( {
 			return this.attr( "class", "" );
 		}
 
-		classes = classesToArray( value );
+		classNames = classesToArray( value );
 
-		if ( classes.length ) {
-			while ( ( elem = this[ i++ ] ) ) {
-				curValue = getClass( elem );
+		if ( classNames.length ) {
+			return this.each( function() {
+				curValue = getClass( this );
 
 				// This expression is here for better compressibility (see addClass)
-				cur = elem.nodeType === 1 && ( " " + stripAndCollapse( curValue ) + " " );
+				cur = this.nodeType === 1 && ( " " + stripAndCollapse( curValue ) + " " );
 
 				if ( cur ) {
-					j = 0;
-					while ( ( clazz = classes[ j++ ] ) ) {
+					for ( i = 0; i < classNames.length; i++ ) {
+						className = classNames[ i ];
 
 						// Remove *all* instances
-						while ( cur.indexOf( " " + clazz + " " ) > -1 ) {
-							cur = cur.replace( " " + clazz + " ", " " );
+						while ( cur.indexOf( " " + className + " " ) > -1 ) {
+							cur = cur.replace( " " + className + " ", " " );
 						}
 					}
 
 					// Only assign if different to avoid unneeded rendering.
 					finalValue = stripAndCollapse( cur );
 					if ( curValue !== finalValue ) {
-						elem.setAttribute( "class", finalValue );
+						this.setAttribute( "class", finalValue );
 					}
 				}
-			}
+			} );
 		}
 
 		return this;
 	},
 
 	toggleClass: function( value, stateVal ) {
-		var type = typeof value,
+		var classNames, className, i, self,
+			type = typeof value,
 			isValidValue = type === "string" || Array.isArray( value );
-
-		if ( typeof stateVal === "boolean" && isValidValue ) {
-			return stateVal ? this.addClass( value ) : this.removeClass( value );
-		}
 
 		if ( isFunction( value ) ) {
 			return this.each( function( i ) {
@@ -8371,17 +9868,20 @@ jQuery.fn.extend( {
 			} );
 		}
 
-		return this.each( function() {
-			var className, i, self, classNames;
+		if ( typeof stateVal === "boolean" && isValidValue ) {
+			return stateVal ? this.addClass( value ) : this.removeClass( value );
+		}
 
+		classNames = classesToArray( value );
+
+		return this.each( function() {
 			if ( isValidValue ) {
 
 				// Toggle individual class names
-				i = 0;
 				self = jQuery( this );
-				classNames = classesToArray( value );
 
-				while ( ( className = classNames[ i++ ] ) ) {
+				for ( i = 0; i < classNames.length; i++ ) {
+					className = classNames[ i ];
 
 					// Check each className given, space separated list
 					if ( self.hasClass( className ) ) {
@@ -8515,7 +10015,7 @@ jQuery.extend( {
 					val :
 
 					// Support: IE <=10 - 11 only
-					// option.text throws exceptions (#14686, #14858)
+					// option.text throws exceptions (trac-14686, trac-14858)
 					// Strip and collapse whitespace
 					// https://html.spec.whatwg.org/#strip-and-collapse-whitespace
 					stripAndCollapse( jQuery.text( elem ) );
@@ -8542,7 +10042,7 @@ jQuery.extend( {
 					option = options[ i ];
 
 					// Support: IE <=9 only
-					// IE8-9 doesn't update selected after form reset (#2551)
+					// IE8-9 doesn't update selected after form reset (trac-2551)
 					if ( ( option.selected || i === index ) &&
 
 							// Don't return options that are disabled or in a disabled optgroup
@@ -8685,8 +10185,8 @@ jQuery.extend( jQuery.event, {
 			return;
 		}
 
-		// Determine event propagation path in advance, per W3C events spec (#9951)
-		// Bubble up to document, then to window; watch for a global ownerDocument var (#9724)
+		// Determine event propagation path in advance, per W3C events spec (trac-9951)
+		// Bubble up to document, then to window; watch for a global ownerDocument var (trac-9724)
 		if ( !onlyHandlers && !special.noBubble && !isWindow( elem ) ) {
 
 			bubbleType = special.delegateType || type;
@@ -8738,7 +10238,7 @@ jQuery.extend( jQuery.event, {
 				acceptData( elem ) ) {
 
 				// Call a native DOM method on the target with the same name as the event.
-				// Don't do default actions on window, that's where global variables be (#6170)
+				// Don't do default actions on window, that's where global variables be (trac-6170)
 				if ( ontype && isFunction( elem[ type ] ) && !isWindow( elem ) ) {
 
 					// Don't re-trigger an onFOO event when we call its FOO() method
@@ -9012,7 +10512,7 @@ var
 	rantiCache = /([?&])_=[^&]*/,
 	rheaders = /^(.*?):[ \t]*([^\r\n]*)$/mg,
 
-	// #7653, #8125, #8152: local protocol detection
+	// trac-7653, trac-8125, trac-8152: local protocol detection
 	rlocalProtocol = /^(?:about|app|app-storage|.+-extension|file|res|widget):$/,
 	rnoContent = /^(?:GET|HEAD)$/,
 	rprotocol = /^\/\//,
@@ -9035,7 +10535,7 @@ var
 	 */
 	transports = {},
 
-	// Avoid comment-prolog char sequence (#10098); must appease lint and evade compression
+	// Avoid comment-prolog char sequence (trac-10098); must appease lint and evade compression
 	allTypes = "*/".concat( "*" ),
 
 	// Anchor tag for parsing the document origin
@@ -9106,7 +10606,7 @@ function inspectPrefiltersOrTransports( structure, options, originalOptions, jqX
 
 // A special extend for ajax options
 // that takes "flat" options (not to be deep extended)
-// Fixes #9887
+// Fixes trac-9887
 function ajaxExtend( target, src ) {
 	var key, deep,
 		flatOptions = jQuery.ajaxSettings.flatOptions || {};
@@ -9517,12 +11017,12 @@ jQuery.extend( {
 		deferred.promise( jqXHR );
 
 		// Add protocol if not provided (prefilters might expect it)
-		// Handle falsy url in the settings object (#10093: consistency with old signature)
+		// Handle falsy url in the settings object (trac-10093: consistency with old signature)
 		// We also use the url parameter if available
 		s.url = ( ( url || s.url || location.href ) + "" )
 			.replace( rprotocol, location.protocol + "//" );
 
-		// Alias method option to type as per ticket #12004
+		// Alias method option to type as per ticket trac-12004
 		s.type = options.method || options.type || s.method || s.type;
 
 		// Extract dataTypes list
@@ -9565,7 +11065,7 @@ jQuery.extend( {
 		}
 
 		// We can fire global events as of now if asked to
-		// Don't fire events if jQuery.event is undefined in an AMD-usage scenario (#15118)
+		// Don't fire events if jQuery.event is undefined in an AMD-usage scenario (trac-15118)
 		fireGlobals = jQuery.event && s.global;
 
 		// Watch for a new set of requests
@@ -9594,7 +11094,7 @@ jQuery.extend( {
 			if ( s.data && ( s.processData || typeof s.data === "string" ) ) {
 				cacheURL += ( rquery.test( cacheURL ) ? "&" : "?" ) + s.data;
 
-				// #9682: remove data so that it's not used in an eventual retry
+				// trac-9682: remove data so that it's not used in an eventual retry
 				delete s.data;
 			}
 
@@ -9867,7 +11367,7 @@ jQuery._evalUrl = function( url, options, doc ) {
 	return jQuery.ajax( {
 		url: url,
 
-		// Make this explicit, since user can override this through ajaxSetup (#11264)
+		// Make this explicit, since user can override this through ajaxSetup (trac-11264)
 		type: "GET",
 		dataType: "script",
 		cache: true,
@@ -9976,7 +11476,7 @@ var xhrSuccessStatus = {
 		0: 200,
 
 		// Support: IE <=9 only
-		// #1450: sometimes IE returns 1223 when it should be 204
+		// trac-1450: sometimes IE returns 1223 when it should be 204
 		1223: 204
 	},
 	xhrSupported = jQuery.ajaxSettings.xhr();
@@ -10048,7 +11548,7 @@ jQuery.ajaxTransport( function( options ) {
 								} else {
 									complete(
 
-										// File: protocol always yields status 0; see #8605, #14207
+										// File: protocol always yields status 0; see trac-8605, trac-14207
 										xhr.status,
 										xhr.statusText
 									);
@@ -10109,7 +11609,7 @@ jQuery.ajaxTransport( function( options ) {
 					xhr.send( options.hasContent && options.data || null );
 				} catch ( e ) {
 
-					// #14683: Only rethrow if this hasn't been notified as an error yet
+					// trac-14683: Only rethrow if this hasn't been notified as an error yet
 					if ( callback ) {
 						throw e;
 					}
@@ -10753,7 +12253,9 @@ jQuery.each(
 
 // Support: Android <=4.0 only
 // Make sure we trim BOM and NBSP
-var rtrim = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g;
+// Require that the "whitespace run" starts from a non-whitespace
+// to avoid O(N^2) behavior when the engine would try matching "\s+$" at each space position.
+var rtrim = /^[\s\uFEFF\xA0]+|([^\s\uFEFF\xA0])[\s\uFEFF\xA0]+$/g;
 
 // Bind a function to a context, optionally partially applying any
 // arguments.
@@ -10820,7 +12322,7 @@ jQuery.isNumeric = function( obj ) {
 jQuery.trim = function( text ) {
 	return text == null ?
 		"" :
-		( text + "" ).replace( rtrim, "" );
+		( text + "" ).replace( rtrim, "$1" );
 };
 
 
@@ -10868,8 +12370,8 @@ jQuery.noConflict = function( deep ) {
 };
 
 // Expose jQuery and $ identifiers, even in AMD
-// (#7102#comment:10, https://github.com/jquery/jquery/pull/557)
-// and CommonJS for browser emulators (#13566)
+// (trac-7102#comment:10, https://github.com/jquery/jquery/pull/557)
+// and CommonJS for browser emulators (trac-13566)
 if ( typeof noGlobal === "undefined" ) {
 	window.jQuery = window.$ = jQuery;
 }
