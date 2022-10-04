@@ -75,6 +75,7 @@ provides location from the browser geolocation API
             var currentOrientation = deviceOrientation.getScreenAdjustedEuler();
 
 deviceOrientation.test = deviceOrientation.isAbsolute();
+console.log( deviceOrientation );
 
             // Calculate the current compass heading that the user is 'looking at' (in degrees)
             var compassHeading = 360 - parseInt( currentOrientation.alpha );

@@ -47,7 +47,7 @@
         var locationCount = 0;
         var testHandler = {
                 setCoords: function( coords ){
-                    var $div = $('.tilt'), 
+                    var $div = $('.location'), 
                         html = 'LOCATION AND SPEED (' + (locationCount++ % 10) + ')';
                     
                     $.each(['latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
@@ -61,11 +61,26 @@
         ns.provider.add( testHandler );    
         ns.provider.add( testHandler );    
 
-    
+        function requestDeviceOrientation () {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', () => {});
+                        }
+                    })
+                    .catch(console.error);
+                } 
+                else {
+                    // handle regular non iOS 13+ devices
+                    console.log ("not iOS");
+                }
+        }
     </script>
-    <div style="text-align: center">1.1.11</div>
+    <div style="text-align: center">1.1.12</div>
     <div class="device"></div>
     <div class="location"></div>
     <div class="tilt"></div>
+    <button onClick="requestDeviceOrientation()">Spørg på IOS</button>
 </body>
 </html>
