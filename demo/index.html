@@ -34,7 +34,7 @@
         var count = 0;
         var testOnDeviceOrientation= function( event ){
             var $div = $('.device'), 
-                html = 'DEVICE ORIENTATION v. 1.1.5 (' + (count++ % 10) + ')';
+                html = 'DEVICE ORIENTATION v. 1.1.6 (' + (count++ % 10) + ')';
 
             $.each(['angle', 'type', 'absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
                 html = html + '<br>' + id + ': ' + event[id];
@@ -63,7 +63,7 @@
 
     
     </script>
-
+    1.1.6
     <div class="device"></div>
     <div class="location"></div>
     <div class="tilt"></div>
