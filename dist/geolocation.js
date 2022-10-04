@@ -542,14 +542,20 @@ provides location from the browser geolocation API
             // Get the current *screen-adjusted* device orientation angles
             var currentOrientation = deviceOrientation.getScreenAdjustedEuler();
 
-window.test = deviceOrientation.isAbsolute();
-
+deviceOrientation.test = deviceOrientation.isAbsolute();
 
             // Calculate the current compass heading that the user is 'looking at' (in degrees)
-            var compassHeading = 360 - currentOrientation.alpha;
+            var compassHeading = 360 - parseInt( currentOrientation.alpha );
+deviceOrientation.test2 = compassHeading;
+
+            var html = '';
+            $.each(['alpha', 'test', 'test2', 'latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
+                html = html + '<br>' + id + ': ' + deviceOrientation[id];
+            });
 
             // Do something with `compassHeading` here...
-            $('.tilt').html('compassHeading = ' + compassHeading);
+// HER>             $('.tilt').html('compassHeading = ' + compassHeading);
+            $('.tilt').html(html);
 
         });
 

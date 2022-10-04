@@ -34,7 +34,7 @@
         var count = 0;
         var testOnDeviceOrientation= function( event ){
             var $div = $('.device'), 
-                html = 'DEVICE ORIENTATION v. 1.1.9 (' + (count++ % 10) + ')';
+                html = 'DEVICE ORIENTATION (' + (count++ % 10) + ')';
 
             $.each(['angle', 'type', 'absolute', 'deviceorientation', 'webkitCompassHeading', 'alpha', 'beta', 'gamma'], function(index, id){
                 html = html + '<br>' + id + ': ' + event[id];
@@ -50,7 +50,7 @@
                     var $div = $('.location'), 
                         html = 'LOCATION AND SPEED (' + (locationCount++ % 10) + ')';
                     
-                    $.each(['test', 'latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
+                    $.each(['latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
                         html = html + '<br>' + id + ': ' + coords[id];
                     });
                     $div.html(html);
@@ -63,7 +63,7 @@
 
     
     </script>
-    <div style="text-align: center">1.1.9</div>
+    <div style="text-align: center">1.1.10</div>
     <div class="device"></div>
     <div class="location"></div>
     <div class="tilt"></div>
