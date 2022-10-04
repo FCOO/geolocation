@@ -47,7 +47,7 @@
         var locationCount = 0;
         var testHandler = {
                 setCoords: function( coords ){
-                    var $div = $('.location'), 
+                    var $div = $('.tilt'), 
                         html = 'LOCATION AND SPEED (' + (locationCount++ % 10) + ')';
                     
                     $.each(['latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
@@ -63,7 +63,7 @@
 
     
     </script>
-    <div style="text-align: center">1.1.10</div>
+    <div style="text-align: center">1.1.11</div>
     <div class="device"></div>
     <div class="location"></div>
     <div class="tilt"></div>
