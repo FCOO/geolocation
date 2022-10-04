@@ -145,6 +145,8 @@ Define global events to handle device orientation and calibration
             });
 
 
+newEvent.test = window.test;
+
             var screenOrientation = window.o9n.getOrientation();
             newEvent.angle = screenOrientation.angle;
             newEvent.type  = screenOrientation.type;
@@ -539,6 +541,9 @@ provides location from the browser geolocation API
         deviceOrientation.listen(function() {
             // Get the current *screen-adjusted* device orientation angles
             var currentOrientation = deviceOrientation.getScreenAdjustedEuler();
+
+window.test = deviceOrientation.isAbsolute();
+
 
             // Calculate the current compass heading that the user is 'looking at' (in degrees)
             var compassHeading = 360 - currentOrientation.alpha;

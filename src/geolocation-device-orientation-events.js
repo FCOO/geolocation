@@ -145,6 +145,8 @@ Define global events to handle device orientation and calibration
             });
 
 
+newEvent.test = window.test;
+
             var screenOrientation = window.o9n.getOrientation();
             newEvent.angle = screenOrientation.angle;
             newEvent.type  = screenOrientation.type;
