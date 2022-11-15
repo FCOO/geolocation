@@ -60,50 +60,69 @@ provides location from the browser geolocation API
 
     //*****************************************************************
     //*****************************************************************
+    var orientationData = new FULLTILT.DeviceOrientation( { 'type': 'world' } );
+
+//orientationData.stop();
+
+orientationData.start(function(){
+
+    console.log('>>>>>>>>>>>', orientationData);
+    console.log('alpha', orientationData.isAvailable(orientationData.ALPHA) );
+    console.log('last raw', orientationData.getLastRawEventData() );
+
+/*
+    var html = '';
+        $.each(['alpha', 'test', 'test2', 'latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
+            html = html + '<br>' + id + ': ' + deviceOrientation[id];
+                });
+
+                // Do something with `compassHeading` here...
+// HER>             $('.tilt').html('compassHeading = ' + compassHeading);
+                $('.tilt').html(html);
+*/
+
+
+});
+
+
+/*
     // Obtain a new *world-oriented* Full Tilt JS DeviceOrientation Promise
     var promise = window.FULLTILT.getDeviceOrientation({ 'type': 'world' });
 
+
     // Wait for Promise result
-    promise.then(function(deviceOrientation) { // Device Orientation Events are supported
-        // Register a callback to run every time a new
-        // deviceorientation event is fired by the browser.
-
-//console.log(deviceOrientation);
-
-        deviceOrientation.listen(function() {
-            // Get the current *screen-adjusted* device orientation angles
-            var currentOrientation = deviceOrientation.getScreenAdjustedEuler();
+    promise
+        .then(function(deviceOrientation) {
+            deviceOrientation.listen(function() {
+                // Get the current *screen-adjusted* device orientation angles
+                var currentOrientation = deviceOrientation.getScreenAdjustedEuler();
 
 deviceOrientation.test = deviceOrientation.isAbsolute();
 console.log( deviceOrientation );
 
-            // Calculate the current compass heading that the user is 'looking at' (in degrees)
-            var compassHeading = 360 - parseInt( currentOrientation.alpha );
+                // Calculate the current compass heading that the user is 'looking at' (in degrees)
+                var compassHeading = 360 - parseInt( currentOrientation.alpha );
 deviceOrientation.test2 = compassHeading;
 
-            var html = '';
-            $.each(['alpha', 'test', 'test2', 'latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
-                html = html + '<br>' + id + ': ' + deviceOrientation[id];
-            });
+                var html = '';
+                $.each(['alpha', 'test', 'test2', 'latitude', 'longitude', 'altitude', 'accuracy', 'altitudeAccuracy', 'heading', 'speed'], function(index, id){
+                    html = html + '<br>' + id + ': ' + deviceOrientation[id];
+                });
 
-            // Do something with `compassHeading` here...
+                // Do something with `compassHeading` here...
 // HER>             $('.tilt').html('compassHeading = ' + compassHeading);
-            $('.tilt').html(html);
+                $('.tilt').html(html);
+            });
+        })
 
+        .catch(function(errorMessage) { // Device Orientation Events are not supported
+            console.log('FULLTILT-error', errorMessage);
+                $('.tilt').html('Error = ' + errorMessage);
+
+            // Implement some fallback controls here...
         });
 
-    }).catch(function(errorMessage) { // Device Orientation Events are not supported
-
-        //console.log('FULLTILT-error', errorMessage);
-            $('.tilt').html('Error = ' + errorMessage);
-
-    // Implement some fallback controls here...
-
-  });
-
-
-
-
+*/
 
 
 

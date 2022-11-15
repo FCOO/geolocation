@@ -59,7 +59,7 @@ window.geolocation.GeolocationHandler:
     /***********************************************************
     GeolocationProvider
     Obejct that provides position, heading, speed etc. from
-    a source. Differnet inherrited versions are created for
+    a source. Different inherrited versions are created for
     geolocation, AIS, manual entering etc.
     Each GeolocationProvider has 0-N GeolocationHandler
     that gets its coords from this

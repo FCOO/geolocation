@@ -1,6 +1,8 @@
 # geolocation
 >
-
+<!--
+Have tryed implementing fulltilt^0.5.3
+-->
 
 ## Description
 Contains tree parts regarding geolocation and device orientation
@@ -62,7 +64,7 @@ This package using the ponyfill [o9n v. 2.1.1](https://github.com/chmanie/o9n) b
         gamma               : NUMBER or null,
 
         angle               : NUMBER or null,
-        type                : STRING or null    //Values = "portrait-primary", "portrait-secondary", 
+        type                : STRING or null    //Values = "portrait-primary", "portrait-secondary",
                                                 //         "landscape-primary", or "landscape-secondary"
     }
 
